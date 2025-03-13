@@ -1,6 +1,11 @@
-name: 'PR Comment Analysis'
-description: 'Analyzes PR diffs and adds relevant comments using an LLM'
-author: 'Your Organization'
+[build]
+entrypoints = ["./src/index.ts"]
+outdir = "./dist"
+target = "node"
+format = "esm"
+
+[test]
+coverage = truer Organization'
 
 inputs:
   github-token:

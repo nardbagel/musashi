@@ -1,10 +1,13 @@
 #!/bin/bash
 
+# Install Bun if not already installed
+if ! command -v bun &> /dev/null; then
+  echo "Installing Bun..."
+  curl -fsSL https://bun.sh/install | bash
+fi
+
 # Install dependencies
 bun install
 
-# Install type declarations
-bun install --save-dev @types/node @types/jest
-
 # Build the project
-bun run build 
+bun run build
