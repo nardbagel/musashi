@@ -1,8 +1,9 @@
-name: PR Analysis
+name: Self Test
 
 on:
   pull_request:
     types: [opened, synchronize]
+  workflow_dispatch:
 
 jobs:
   analyze:
@@ -11,20 +12,36 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       
-      - name: Analyze PR
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+          
+      - name: Check file contents
+        run: |
+          echo "--- bunfig.toml ---"
+          cat bunfig.toml || echo "File not found"
+          echo "--- action.yml ---"
+          cat action.yml || echo "File not found"
+          
+      - name: Install dependencies
+        run: bun install
+        
+      - name: Build
+        run: |
+          bun run build
+          ls -la dist
+          
+      - name: Run PR Analysis on this repo
         uses: ./
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.MUSASHI }}
           repo-name: ${{ github.repository }}
-          pr-number: ${{ github.event.pull_request.number }}
+          pr-number: ${{ github.event.pull_request.number || 1 }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-provider: 'openai'
           comment-rules: |
             {
-              "customInstructions": "Focus on security issues, performance improvements, and code quality"
+              "customInstructions": "Focus on TypeScript best practices and code quality"
             }
-          log-level: "info"
-      
-      - name: Report Results
-        run: |
-          echo "Analysis complete. Posted ${{ steps.analyze.outputs.comment-count }} comments."
-          echo "Summary: ${{ steps.analyze.outputs.analysis-summary }}" 
+          log-level: "debug"

@@ -23,6 +23,14 @@ inputs:
     description: 'Logging level (debug, info, warn, error)'
     required: false
     default: 'info'
+  llm-provider:
+    description: 'LLM provider to use (openai or anthropic)'
+    required: false
+    default: 'openai'
+  llm-model:
+    description: 'Specific model to use'
+    required: false
+    default: ''
 
 runs:
   using: 'node16'
@@ -30,4 +38,4 @@ runs:
 
 branding:
   icon: 'message-square'
-  color: 'blue' 
+  color: 'blue'

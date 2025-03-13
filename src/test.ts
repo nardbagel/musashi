@@ -1,6 +1,6 @@
 import { analyzeDiff } from './llm/analyzer';
 import { postComments } from './github/comments';
-import { Comment, OctokitType } from './types';
+import { Comment } from './types';
 
 /**
  * Simple test function to verify the GitHub Action works correctly
@@ -23,7 +23,7 @@ async function testAction(): Promise<void> {
     console.log(`Testing with repo: ${repoName}, PR: ${prNumber}`);
 
     // Mock GitHub client (this would normally be initialized with octokit)
-    const mockOctokit: OctokitType = {
+    const mockOctokit = {
       rest: {
         pulls: {
           get: async () => ({ data: { title: 'Test PR' } }),

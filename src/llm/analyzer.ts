@@ -40,7 +40,7 @@ export async function analyzeDiff(
         response = await callAnthropicApi(prompt, apiKey, model || 'claude-3-7-sonnet-20250219');
         break;
       case 'openai':
-        response = await callOpenAIApi(prompt, apiKey, model || 'gpt-4');
+        response = await callOpenAIApi(prompt, apiKey, model || 'gpt-4o-mini');
         break;
       default:
         throw new Error(`Unsupported LLM provider: ${provider}`);
@@ -77,7 +77,7 @@ Please follow these guidelines:
 1. Focus on code quality, potential bugs, security issues, and performance concerns
 2. Be specific and actionable in your feedback
 3. Use a constructive and helpful tone
-4. Format your response as JSON with the following structure:
+4. IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
    {
      "comments": [
        {
@@ -217,8 +217,17 @@ async function callAnthropicApi(prompt: string, apiKey: string, model: string): 
  */
 function parseResponse(response: string): AnalysisResults {
   try {
+    // Clean up the response - remove markdown code blocks if present
+    let cleanedResponse = response;
+
+    // Remove markdown code blocks if present (```json ... ```)
+    const codeBlockMatch = response.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (codeBlockMatch && codeBlockMatch[1]) {
+      cleanedResponse = codeBlockMatch[1];
+    }
+
     // Try to parse the response as JSON
-    const parsedResponse = JSON.parse(response) as Partial<AnalysisResults>;
+    const parsedResponse = JSON.parse(cleanedResponse) as Partial<AnalysisResults>;
 
     // Validate the response structure
     if (!parsedResponse.comments || !Array.isArray(parsedResponse.comments)) {

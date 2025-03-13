@@ -28,7 +28,7 @@ jobs:
       - name: Analyze PR
         uses: your-org/pr-comment-analysis@v1
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.MUSASHI }}
           repo-name: ${{ github.repository }}
           pr-number: ${{ github.event.pull_request.number }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
@@ -71,15 +71,14 @@ You can customize the behavior of the LLM by providing a JSON object with the fo
 
 ### Prerequisites
 
-- Node.js 16+
-- npm or yarn
+- bun
 - TypeScript knowledge
 
 ### Setup
 
 1. Clone the repository
-2. Install dependencies: `npm install`
-3. Build the action: `npm run build`
+2. Install dependencies: `bun install`
+3. Build the action: `bun build`
 
 ### TypeScript Development
 
@@ -87,21 +86,21 @@ This project is built with TypeScript for improved type safety and developer exp
 
 To check types without building:
 ```
-npm run typecheck
+bun typecheck
 ```
 
 To build the TypeScript code:
 ```
-npm run build
+bun build
 ```
 
 ### Testing
 
-Run tests with: `npm test`
+Run tests with: `bun test`
 
 For manual testing, you can use:
 ```
-npm run test:manual
+bun test:manual
 ```
 
 ## License

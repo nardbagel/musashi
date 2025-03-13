@@ -1,6 +1,5 @@
 import * as core from '@actions/core';
-import { OctokitType } from '../types';
-
+import type { Octokit } from 'octokit';
 /**
  * Get the diff for a specific pull request
  * 
@@ -11,7 +10,7 @@ import { OctokitType } from '../types';
  * @returns The PR diff as a string
  */
 export async function getPullRequestDiff(
-  octokit: OctokitType,
+  octokit: Octokit,
   owner: string,
   repo: string,
   prNumber: number
