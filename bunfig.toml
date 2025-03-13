@@ -5,7 +5,7 @@ target = "node"
 format = "esm"
 
 [test]
-coverage = truer Organization'
+coverage = truer Organization
 
 inputs:
   github-token:
