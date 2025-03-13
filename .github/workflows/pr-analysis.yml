@@ -1,0 +1,30 @@
+name: PR Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      - name: Analyze PR
+        uses: ./
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-name: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          comment-rules: |
+            {
+              "customInstructions": "Focus on security issues, performance improvements, and code quality"
+            }
+          log-level: "info"
+      
+      - name: Report Results
+        run: |
+          echo "Analysis complete. Posted ${{ steps.analyze.outputs.comment-count }} comments."
+          echo "Summary: ${{ steps.analyze.outputs.analysis-summary }}" 

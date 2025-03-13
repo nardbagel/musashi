@@ -1,0 +1,33 @@
+name: 'PR Comment Analysis'
+description: 'Analyzes PR diffs and adds relevant comments using an LLM'
+author: 'Your Organization'
+
+inputs:
+  github-token:
+    description: 'GitHub token for API access'
+    required: true
+  repo-name:
+    description: 'Target repository name (owner/repo)'
+    required: true
+  pr-number:
+    description: 'Pull request number to analyze'
+    required: true
+  llm-api-key:
+    description: 'API key for the LLM service'
+    required: true
+  comment-rules:
+    description: 'JSON configuration for comment rules'
+    required: false
+    default: '{}'
+  log-level:
+    description: 'Logging level (debug, info, warn, error)'
+    required: false
+    default: 'info'
+
+runs:
+  using: 'node16'
+  main: 'dist/index.js'
+
+branding:
+  icon: 'message-square'
+  color: 'blue' 
