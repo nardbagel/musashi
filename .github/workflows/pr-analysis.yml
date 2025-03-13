@@ -17,6 +17,13 @@ jobs:
         with:
           bun-version: latest
           
+      - name: Check file contents
+        run: |
+          echo "--- bunfig.toml ---"
+          cat bunfig.toml || echo "File not found"
+          echo "--- action.yml ---"
+          cat action.yml || echo "File not found"
+          
       - name: Install dependencies
         run: bun install
         
