@@ -5,42 +5,4 @@ target = "node"
 format = "esm"
 
 [test]
-coverage = truer Organization
-
-inputs:
-  github-token:
-    description: 'GitHub token for API access'
-    required: true
-  repo-name:
-    description: 'Target repository name (owner/repo)'
-    required: true
-  pr-number:
-    description: 'Pull request number to analyze'
-    required: true
-  llm-api-key:
-    description: 'API key for the LLM service'
-    required: true
-  comment-rules:
-    description: 'JSON configuration for comment rules'
-    required: false
-    default: '{}'
-  log-level:
-    description: 'Logging level (debug, info, warn, error)'
-    required: false
-    default: 'info'
-  llm-provider:
-    description: 'LLM provider to use (openai or anthropic)'
-    required: false
-    default: 'openai'
-  llm-model:
-    description: 'Specific model to use'
-    required: false
-    default: ''
-
-runs:
-  using: 'node16'
-  main: 'dist/index.js'
-
-branding:
-  icon: 'message-square'
-  color: 'blue'
+coverage = true
