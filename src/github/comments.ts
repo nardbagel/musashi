@@ -1,5 +1,6 @@
 import * as core from '@actions/core';
-import { Comment, LineComment, PRComment, OctokitType } from '../types';
+import { Comment, LineComment, PRComment } from '../types';
+import { Octokit } from 'octokit';
 
 /**
  * Post comments to a pull request
@@ -11,7 +12,7 @@ import { Comment, LineComment, PRComment, OctokitType } from '../types';
  * @param comments - Array of comment objects to post
  */
 export async function postComments(
-  octokit: OctokitType,
+  octokit: Octokit,
   owner: string,
   repo: string,
   prNumber: number,
@@ -55,7 +56,7 @@ export async function postComments(
  * @param comment - Comment object with file, line, and body
  */
 async function postLineComment(
-  octokit: OctokitType,
+  octokit: Octokit,
   owner: string,
   repo: string,
   prNumber: number,
@@ -98,7 +99,7 @@ async function postLineComment(
  * @param comment - Comment object with body
  */
 async function postPrComment(
-  octokit: OctokitType,
+  octokit: Octokit,
   owner: string,
   repo: string,
   prNumber: number,
