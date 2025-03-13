@@ -28,7 +28,7 @@ jobs:
       - name: Analyze PR
         uses: your-org/pr-comment-analysis@v1
         with:
-          github-token: ${{ secrets.Musashi }}
+          github-token: ${{ secrets.MUSASHI }}
           repo-name: ${{ github.repository }}
           pr-number: ${{ github.event.pull_request.number }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}

@@ -35,7 +35,7 @@ jobs:
       - name: Run PR Analysis on this repo
         uses: ./
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.MUSASHI }}
           repo-name: ${{ github.repository }}
           pr-number: ${{ github.event.pull_request.number || 1 }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
