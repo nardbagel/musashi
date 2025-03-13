@@ -4,11 +4,12 @@
   "description": "GitHub Action that analyzes PR diffs and adds relevant comments using an LLM",
   "main": "dist/index.js",
   "scripts": {
-    "build": "ncc build src/index.js -o dist",
+    "build": "tsc && ncc build lib/index.js -o dist",
     "test": "jest",
-    "test:manual": "node src/test.js",
-    "lint": "eslint src/**/*.js",
-    "format": "prettier --write src/**/*.js"
+    "test:manual": "ts-node src/test.ts",
+    "lint": "eslint src/**/*.ts",
+    "format": "prettier --write src/**/*.ts",
+    "typecheck": "tsc --noEmit"
   },
   "keywords": [
     "github",
@@ -26,9 +27,16 @@
     "simple-git": "^3.16.0"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.0",
+    "@types/node": "^18.15.3",
+    "@typescript-eslint/eslint-plugin": "^5.55.0",
+    "@typescript-eslint/parser": "^5.55.0",
     "@vercel/ncc": "^0.36.1",
     "eslint": "^8.36.0",
     "jest": "^29.5.0",
-    "prettier": "^2.8.4"
+    "prettier": "^2.8.4",
+    "ts-jest": "^29.0.5",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.0.2"
   }
 }

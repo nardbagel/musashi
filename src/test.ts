@@ -1,13 +1,12 @@
-const { analyzeDiff } = require('./llm/analyzer');
-const { cloneRepository } = require('./utils/git');
-const { getPullRequestDiff } = require('./github/pullRequest');
-const { postComments } = require('./github/comments');
+import { analyzeDiff } from './llm/analyzer';
+import { postComments } from './github/comments';
+import { Comment, OctokitType } from './types';
 
 /**
  * Simple test function to verify the GitHub Action works correctly
  * This can be run locally to test the action without deploying it
  */
-async function testAction() {
+async function testAction(): Promise<void> {
   try {
     console.log('Starting test of PR Comment Analysis Action');
 
@@ -24,14 +23,18 @@ async function testAction() {
     console.log(`Testing with repo: ${repoName}, PR: ${prNumber}`);
 
     // Mock GitHub client (this would normally be initialized with octokit)
-    const mockOctokit = {
+    const mockOctokit: OctokitType = {
       rest: {
         pulls: {
           get: async () => ({ data: { title: 'Test PR' } }),
-          listFiles: async () => ({ data: [{ filename: 'test.js', status: 'modified' }] })
+          listFiles: async () => ({ data: [{ filename: 'test.js', status: 'modified' }] }),
+          createReviewComment: async (params: any) => {
+            console.log(`Would post line comment to ${params.path}:${params.line}`);
+            return { data: { id: 123 } };
+          }
         },
         issues: {
-          createComment: async (params) => {
+          createComment: async (params: any) => {
             console.log(`Would post comment to PR: ${params.body.substring(0, 50)}...`);
             return { data: { id: 123 } };
           }
@@ -50,7 +53,7 @@ index 1234567..abcdefg 100644
 +  console.log("Hello world!");
    return true;
  }
- `
+`
         };
       }
     };
@@ -60,8 +63,8 @@ index 1234567..abcdefg 100644
 
     // Get PR diff
     console.log('Fetching PR diff...');
-    const diff = await getPullRequestDiff(mockOctokit, repoName.split('/')[0], repoName.split('/')[1], prNumber);
-    console.log(`Retrieved mock diff (${diff.length} bytes)`);
+    const diff = await mockOctokit.request();
+    console.log(`Retrieved mock diff (${(diff.data as string).length} bytes)`);
 
     // Analyze the diff
     console.log('Analyzing diff with LLM...');
@@ -69,13 +72,13 @@ index 1234567..abcdefg 100644
     const mockAnalysisResults = {
       comments: [
         {
-          type: 'line',
+          type: 'line' as const,
           file: 'test.js',
           line: 2,
           body: 'Consider using a template literal instead of concatenation.'
         },
         {
-          type: 'pr',
+          type: 'pr' as const,
           body: 'Overall this is a minor change that looks good.'
         }
       ],
@@ -86,12 +89,18 @@ index 1234567..abcdefg 100644
 
     // Post comments
     console.log('Posting comments...');
-    await postComments(mockOctokit, repoName.split('/')[0], repoName.split('/')[1], prNumber, mockAnalysisResults.comments);
+    await postComments(
+      mockOctokit,
+      repoName.split('/')[0],
+      repoName.split('/')[1],
+      prNumber,
+      mockAnalysisResults.comments
+    );
 
     console.log('Test completed successfully!');
   } catch (error) {
-    console.error(`Test failed with error: ${error.message}`);
-    if (error.stack) {
+    console.error(`Test failed with error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    if (error instanceof Error && error.stack) {
       console.error(error.stack);
     }
     process.exit(1);
@@ -103,6 +112,6 @@ if (require.main === module) {
   testAction();
 }
 
-module.exports = {
+export {
   testAction
 }; 

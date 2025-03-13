@@ -73,6 +73,7 @@ You can customize the behavior of the LLM by providing a JSON object with the fo
 
 - Node.js 16+
 - npm or yarn
+- TypeScript knowledge
 
 ### Setup
 
@@ -80,9 +81,28 @@ You can customize the behavior of the LLM by providing a JSON object with the fo
 2. Install dependencies: `npm install`
 3. Build the action: `npm run build`
 
+### TypeScript Development
+
+This project is built with TypeScript for improved type safety and developer experience. The TypeScript configuration is in `tsconfig.json`.
+
+To check types without building:
+```
+npm run typecheck
+```
+
+To build the TypeScript code:
+```
+npm run build
+```
+
 ### Testing
 
 Run tests with: `npm test`
+
+For manual testing, you can use:
+```
+npm run test:manual
+```
 
 ## License
 

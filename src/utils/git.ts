@@ -1,17 +1,17 @@
-const core = require('@actions/core');
-const fs = require('fs');
-const path = require('path');
-const simpleGit = require('simple-git');
-const os = require('os');
+import * as core from '@actions/core';
+import * as fs from 'fs';
+import * as path from 'path';
+import simpleGit from 'simple-git';
+import * as os from 'os';
 
 /**
  * Clone the target repository to a temporary directory
  * 
- * @param {string} repoName - Repository name in format 'owner/repo'
- * @param {string} token - GitHub token for authentication
- * @returns {Promise<string>} - Path to the cloned repository
+ * @param repoName - Repository name in format 'owner/repo'
+ * @param token - GitHub token for authentication
+ * @returns Path to the cloned repository
  */
-async function cloneRepository(repoName, token) {
+export async function cloneRepository(repoName: string, token: string): Promise<string> {
   try {
     // Create a temporary directory for the repository
     const tempDir = path.join(os.tmpdir(), `pr-analysis-${Date.now()}`);
@@ -28,11 +28,11 @@ async function cloneRepository(repoName, token) {
 
     return tempDir;
   } catch (error) {
-    core.error(`Failed to clone repository: ${error.message}`);
+    if (error instanceof Error) {
+      core.error(`Failed to clone repository: ${error.message}`);
+    } else {
+      core.error(`Failed to clone repository: Unknown error`);
+    }
     throw error;
   }
-}
-
-module.exports = {
-  cloneRepository
-}; 
+} 

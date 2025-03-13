@@ -13,7 +13,7 @@
    - [x] Outline the key steps: clone repo, get context, analyze PR diff, log comments
    - [x] Determine config options: target repo/PR, credentials, comment rules, logging
    - [x] Decide how Goose integrates into the Action flow
-- [x] Identify any dependencies or constraints  
+- [x] Identify any dependencies and constraints  
    - [x] GitHub API client library to use
    - [x] Credential management approach
    - [x] Execution environment requirements
@@ -27,6 +27,15 @@
    - [x] Set up config parsing and validation
    - [x] Invoke Goose to perform the automated steps
    - [x] Handle cloning the repo and pushing comments
+- [x] Add support for multiple LLM providers
+   - [x] Implement OpenAI integration
+   - [x] Implement Anthropic integration
+   - [x] Make provider selection configurable
+- [x] Convert project to TypeScript
+   - [x] Add TypeScript configuration
+   - [x] Define interfaces and types
+   - [x] Convert JavaScript files to TypeScript
+   - [x] Update tests for TypeScript
 - [ ] Test and iterate
    - [ ] Trial run on sample repos and PRs
    - [ ] Debug and refine Goose prompts as needed
