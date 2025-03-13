@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # Install dependencies
-npm install
+bun install
 
 # Install type declarations
-npm install --save-dev @types/node @types/jest
+bun install --save-dev @types/node @types/jest
 
 # Build the project
-npm run build 
+bun run build 
