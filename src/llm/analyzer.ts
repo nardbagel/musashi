@@ -40,7 +40,7 @@ export async function analyzeDiff(
         response = await callAnthropicApi(prompt, apiKey, model || 'claude-3-7-sonnet-20250219');
         break;
       case 'openai':
-        response = await callOpenAIApi(prompt, apiKey, model || 'gpt-4');
+        response = await callOpenAIApi(prompt, apiKey, model || 'gpt-4o-mini');
         break;
       default:
         throw new Error(`Unsupported LLM provider: ${provider}`);
