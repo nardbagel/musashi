@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PR Comment Analysis - GitHub Action</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+  <script>hljs.highlightAll();</script>
+</head>
+
+<body>
+  <header>
+    <div class="container">
+      <h1>PR Comment Analysis</h1>
+      <p class="subtitle">A GitHub Action for automated code reviews using LLMs</p>
+    </div>
+  </header>
+
+  <main class="container">
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>
+        PR Comment Analysis is a GitHub Action that automatically analyzes pull request diffs using an LLM
+        (Large Language Model) and adds relevant comments to improve code quality. It supports both OpenAI
+        and Anthropic models, making it flexible for different needs and budgets.
+      </p>
+      <p>
+        The action clones your repository, analyzes the diff in a PR, and adds helpful comments directly
+        to the PR, acting as an automated code reviewer.
+      </p>
+    </section>
+
+    <section id="features">
+      <h2>Features</h2>
+      <ul>
+        <li>Analyzes PR diffs using OpenAI or Anthropic LLMs</li>
+        <li>Posts line-specific comments on code that could be improved</li>
+        <li>Provides a summary comment of the overall PR</li>
+        <li>Configurable rules for comment generation</li>
+        <li>Works with any GitHub repository</li>
+        <li>Built with TypeScript for type safety</li>
+      </ul>
+    </section>
+
+    <section id="installation">
+      <h2>Installation</h2>
+      <p>
+        To use this GitHub Action in your repository, add it to your workflow file:
+      </p>
+      <pre><code class="language-yaml"># .github/workflows/pr-analysis.yml
+name: PR Analysis
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Analyze PR
+        uses: nardbagel/pr-comment-analysis@v1
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repo-name: ${{ github.repository }}
+          pr-number: ${{ github.event.pull_request.number }}
+          llm-api-key: ${{ secrets.LLM_API_KEY }}
+          llm-provider: 'openai'  # or 'anthropic'
+          comment-rules: |
+            {
+              "customInstructions": "Focus on security issues and performance improvements"
+            }
+          log-level: "info"</code></pre>
+    </section>
+
+    <section id="configuration">
+      <h2>Configuration</h2>
+      <h3>Inputs</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Input</th>
+            <th>Description</th>
+            <th>Required</th>
+            <th>Default</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>github-token</code></td>
+            <td>GitHub token for API access</td>
+            <td>Yes</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td><code>repo-name</code></td>
+            <td>Target repository name (owner/repo)</td>
+            <td>Yes</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td><code>pr-number</code></td>
+            <td>Pull request number to analyze</td>
+            <td>Yes</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td><code>llm-api-key</code></td>
+            <td>API key for the LLM service</td>
+            <td>Yes</td>
+            <td>N/A</td>
+          </tr>
+          <tr>
+            <td><code>comment-rules</code></td>
+            <td>JSON configuration for comment rules</td>
+            <td>No</td>
+            <td><code>{}</code></td>
+          </tr>
+          <tr>
+            <td><code>log-level</code></td>
+            <td>Logging level (debug, info, warn, error)</td>
+            <td>No</td>
+            <td><code>info</code></td>
+          </tr>
+          <tr>
+            <td><code>llm-provider</code></td>
+            <td>LLM provider to use (openai or anthropic)</td>
+            <td>No</td>
+            <td><code>openai</code></td>
+          </tr>
+          <tr>
+            <td><code>llm-model</code></td>
+            <td>Specific model to use</td>
+            <td>No</td>
+            <td>Provider-specific default</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>Outputs</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Output</th>
+            <th>Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>comment-count</code></td>
+            <td>Number of comments posted</td>
+          </tr>
+          <tr>
+            <td><code>analysis-summary</code></td>
+            <td>Summary of the analysis</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="llm-providers">
+      <h2>LLM Providers</h2>
+      <p>This action supports multiple LLM providers:</p>
+
+      <h3>OpenAI</h3>
+      <p>
+        When using OpenAI (<code>llm-provider: 'openai'</code>), you can specify models like:
+      </p>
+      <ul>
+        <li><code>gpt-4</code> (default)</li>
+        <li><code>gpt-4-turbo</code></li>
+        <li><code>gpt-3.5-turbo</code></li>
+      </ul>
+
+      <h3>Anthropic</h3>
+      <p>
+        When using Anthropic (<code>llm-provider: 'anthropic'</code>), you can specify models like:
+      </p>
+      <ul>
+        <li><code>claude-3-7-sonnet-20250219</code> (default)</li>
+        <li><code>claude-3-opus-20240229</code></li>
+        <li><code>claude-3-sonnet-20240229</code></li>
+        <li><code>claude-3-haiku-20240307</code></li>
+      </ul>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>Basic Usage</h3>
+      <pre><code class="language-yaml">- name: Analyze PR
+  uses: nardbagel/pr-comment-analysis@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    repo-name: ${{ github.repository }}
+    pr-number: ${{ github.event.pull_request.number }}
+    llm-api-key: ${{ secrets.OPENAI_API_KEY }}</code></pre>
+
+      <h3>Using Anthropic Claude</h3>
+      <pre><code class="language-yaml">- name: Analyze PR with Claude
+  uses: nardbagel/pr-comment-analysis@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    repo-name: ${{ github.repository }}
+    pr-number: ${{ github.event.pull_request.number }}
+    llm-api-key: ${{ secrets.ANTHROPIC_API_KEY }}
+    llm-provider: 'anthropic'
+    llm-model: 'claude-3-opus-20240229'</code></pre>
+
+      <h3>Custom Comment Rules</h3>
+      <pre><code class="language-yaml">- name: Analyze PR with Custom Rules
+  uses: nardbagel/pr-comment-analysis@v1
+  with:
+    github-token: ${{ secrets.GITHUB_TOKEN }}
+    repo-name: ${{ github.repository }}
+    pr-number: ${{ github.event.pull_request.number }}
+    llm-api-key: ${{ secrets.OPENAI_API_KEY }}
+    comment-rules: |
+      {
+        "customInstructions": "Focus on security vulnerabilities, performance optimizations, and adherence to best practices. Ignore minor style issues."
+      }</code></pre>
+    </section>
+
+    <section id="development">
+      <h2>Development</h2>
+      <p>
+        If you want to contribute to this project or run it locally, follow these steps:
+      </p>
+
+      <h3>Prerequisites</h3>
+      <ul>
+        <li>Bun (recommended) or Node.js 16+</li>
+        <li>TypeScript knowledge</li>
+      </ul>
+
+      <h3>Setup</h3>
+      <ol>
+        <li>Clone the repository: <code>git clone https://github.com/nardbagel/pr-comment-analysis.git</code></li>
+        <li>Install dependencies: <code>bun install</code> or <code>npm install</code></li>
+        <li>Build the action: <code>bun run build</code> or <code>npm run build</code></li>
+      </ol>
+
+      <h3>Testing</h3>
+      <p>
+        Run tests with: <code>bun test</code> or <code>npm test</code>
+      </p>
+      <p>
+        For manual testing, you can use: <code>bun run test:manual</code> or <code>npm run test:manual</code>
+      </p>
+    </section>
+
+    <section id="license">
+      <h2>License</h2>
+      <p>
+        This project is licensed under the MIT License - see the LICENSE file for details.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>&copy; 2023 PR Comment Analysis. MIT License.</p>
+      <p>
+        <a href="https://github.com/nardbagel/pr-comment-analysis">GitHub Repository</a>
+      </p>
+    </div>
+  </footer>
+</body>
+
+</html>

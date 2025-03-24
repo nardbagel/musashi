@@ -1,0 +1,8 @@
+[build]
+entrypoints = ["./src/index.ts"]
+outdir = "./dist"
+target = "node"
+format = "esm"
+
+[test]
+coverage = true

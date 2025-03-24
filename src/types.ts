@@ -32,8 +32,6 @@ export interface CommentRules {
 // LLM Provider types
 export type LLMProvider = 'openai' | 'anthropic';
 
-// Octokit type
-export type OctokitType = any;
 
 // API Response types
 export interface OpenAIResponse {
