@@ -11,12 +11,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
           bun-version: latest
-          
+
       - name: Check file contents
         run: |
           echo "--- bunfig.toml ---"
@@ -25,15 +25,15 @@ jobs:
           cat action.yml || echo "File not found"
           echo "--- .musashi (if exists) ---"
           cat .musashi || echo "File not found"
-          
+
       - name: Install dependencies
         run: bun install
-        
+
       - name: Build
         run: |
           bun run build
           ls -la dist
-          
+
       - name: Run PR Analysis on this repo
         uses: ./
         with:
@@ -41,6 +41,6 @@ jobs:
           # repo-name will use default (github.repository)
           pr-number: ${{ github.event.pull_request.number || 1 }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
-          llm-provider: 'openai'
+          llm-provider: "openai"
           # Rules will be read from .musashi file if it exists
           log-level: "debug"
