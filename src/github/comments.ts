@@ -1,5 +1,5 @@
 import * as core from '@actions/core';
-import { Comment, LineComment, PRComment, OctokitType } from '../types';
+import { Comment, LineComment, OctokitType, PRComment } from '../types';
 
 /**
  * Post comments to a pull request
@@ -20,11 +20,32 @@ export async function postComments(
   try {
     core.debug(`Posting ${comments.length} comments to PR #${prNumber}`);
 
+    // Get PR details to get the latest commit SHA
+    const { data: pr } = await octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: prNumber
+    });
+
+    // Get the files changed in the PR to get positions
+    const { data: files } = await octokit.rest.pulls.listFiles({
+      owner,
+      repo,
+      pull_number: prNumber
+    });
+
     // Process each comment
     for (const comment of comments) {
       if (comment.type === 'line') {
+        // Find the file in the PR
+        const file = files.find((f: { filename: string; patch?: string }) => f.filename === comment.file);
+        if (!file) {
+          core.warning(`File ${comment.file} not found in PR`);
+          continue;
+        }
+
         // Post a line comment
-        await postLineComment(octokit, owner, repo, prNumber, comment);
+        await postLineComment(octokit, owner, repo, prNumber, comment, pr.head.sha, file.patch);
       } else if (comment.type === 'pr') {
         // Post a general PR comment
         await postPrComment(octokit, owner, repo, prNumber, comment);
@@ -46,6 +67,33 @@ export async function postComments(
 }
 
 /**
+ * Find the position in the diff for a given line number
+ * 
+ * @param patch - The file patch from GitHub API
+ * @param targetLine - The line number to find
+ * @returns The position in the diff
+ */
+function findPositionInDiff(patch: string | undefined, targetLine: number): number | null {
+  if (!patch) return null;
+
+  const lines = patch.split('\n');
+  let currentLine = 0;
+  let position = 0;
+
+  for (const line of lines) {
+    position++;
+    if (line.startsWith('+') || line.startsWith(' ')) {
+      currentLine++;
+      if (currentLine === targetLine) {
+        return position;
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
  * Post a line-specific comment
  * 
  * @param octokit - Initialized Octokit client
@@ -59,24 +107,30 @@ async function postLineComment(
   owner: string,
   repo: string,
   prNumber: number,
-  comment: LineComment
+  comment: LineComment,
+  commitSha: string,
+  patch: string | undefined
 ): Promise<void> {
   try {
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
 
-    const params: any = {
+    // Find the position in the diff
+    const position = findPositionInDiff(patch, comment.line);
+    if (!position) {
+      core.warning(`Could not find position for line ${comment.line} in file ${comment.file}`);
+      return;
+    }
+
+    const params = {
       owner,
       repo,
       pull_number: prNumber,
       body: comment.body,
+      commit_id: commitSha,
       path: comment.file,
-      line: comment.line
+      position,
+      side: 'RIGHT' as const
     };
-
-    // Only add commit_id if it exists
-    if (comment.commit_id) {
-      params.commit_id = comment.commit_id;
-    }
 
     await octokit.rest.pulls.createReviewComment(params);
   } catch (error) {
