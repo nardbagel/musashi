@@ -1,0 +1,12 @@
+{
+  "customInstructions": "Focus on TypeScript best practices, code quality, and potential security issues",
+  "includePaths": [
+    "src/**/*.ts",
+    "src/**/*.tsx"
+  ],
+  "excludePaths": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/dist/**"
+  ]
+}

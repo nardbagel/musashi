@@ -1,18 +1,18 @@
 // Comment types
 export interface BaseComment {
-  type: 'line' | 'pr';
+  type: "line" | "pr";
   body: string;
 }
 
 export interface LineComment extends BaseComment {
-  type: 'line';
+  type: "line";
   file: string;
   line: number;
   commit_id?: string;
 }
 
 export interface PRComment extends BaseComment {
-  type: 'pr';
+  type: "pr";
 }
 
 export type Comment = LineComment | PRComment;
@@ -26,12 +26,13 @@ export interface AnalysisResults {
 // Configuration rules
 export interface CommentRules {
   customInstructions?: string;
+  includePaths?: string[];
+  excludePaths?: string[];
   [key: string]: any;
 }
 
 // LLM Provider types
-export type LLMProvider = 'openai' | 'anthropic';
-
+export type LLMProvider = "openai" | "anthropic";
 
 // API Response types
 export interface OpenAIResponse {
@@ -57,6 +58,6 @@ export interface AxiosError extends Error {
 }
 
 // Declare isAxiosError function
-declare module 'axios' {
+declare module "axios" {
   export function isAxiosError(error: any): error is AxiosError;
-} 
+}
