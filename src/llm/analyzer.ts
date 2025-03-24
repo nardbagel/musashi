@@ -1,18 +1,19 @@
-import * as core from '@actions/core';
-import axios from 'axios';
+import * as core from "@actions/core";
+import axios from "axios";
+import micromatch from "micromatch";
 import {
   AnalysisResults,
+  AnthropicResponse,
+  AxiosError,
   Comment,
   CommentRules,
   LLMProvider,
   OpenAIResponse,
-  AnthropicResponse,
-  AxiosError
-} from '../types';
+} from "../types";
 
 /**
  * Analyze a PR diff using an LLM and generate comments
- * 
+ *
  * @param diff - The PR diff as a string
  * @param apiKey - API key for the LLM service
  * @param rules - Configuration rules for comment generation
@@ -24,11 +25,19 @@ export async function analyzeDiff(
   diff: string,
   apiKey: string,
   rules: CommentRules,
-  provider: LLMProvider = 'openai',
+  provider: LLMProvider = "openai",
   model?: string
 ): Promise<AnalysisResults> {
   try {
     core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
+
+    // Filter diff by include/exclude paths if specified
+    if (rules.includePaths?.length || rules.excludePaths?.length) {
+      diff = filterDiffByPaths(diff, rules.includePaths, rules.excludePaths);
+      core.debug(
+        `Filtered diff to ${diff.length} bytes based on path patterns`
+      );
+    }
 
     // Prepare the prompt for the LLM
     const prompt = generatePrompt(diff, rules);
@@ -36,11 +45,15 @@ export async function analyzeDiff(
     // Call the appropriate LLM API based on provider
     let response: string;
     switch (provider.toLowerCase() as LLMProvider) {
-      case 'anthropic':
-        response = await callAnthropicApi(prompt, apiKey, model || 'claude-3-7-sonnet-20250219');
+      case "anthropic":
+        response = await callAnthropicApi(
+          prompt,
+          apiKey,
+          model || "claude-3-7-sonnet-20250219"
+        );
         break;
-      case 'openai':
-        response = await callOpenAIApi(prompt, apiKey, model || 'gpt-4o-mini');
+      case "openai":
+        response = await callOpenAIApi(prompt, apiKey, model || "gpt-4o-mini");
         break;
       default:
         throw new Error(`Unsupported LLM provider: ${provider}`);
@@ -49,7 +62,21 @@ export async function analyzeDiff(
     // Parse the LLM response into structured comments
     const analysisResults = parseResponse(response);
 
-    core.debug(`Analysis generated ${analysisResults.comments.length} comments`);
+    // Filter out comments for excluded files
+    if (rules.includePaths?.length || rules.excludePaths?.length) {
+      analysisResults.comments = filterCommentsByPaths(
+        analysisResults.comments,
+        rules.includePaths,
+        rules.excludePaths
+      );
+      core.debug(
+        `Filtered comments to ${analysisResults.comments.length} based on path patterns`
+      );
+    }
+
+    core.debug(
+      `Analysis generated ${analysisResults.comments.length} comments`
+    );
     return analysisResults;
   } catch (error) {
     if (error instanceof Error) {
@@ -62,8 +89,103 @@ export async function analyzeDiff(
 }
 
 /**
+ * Filter the diff to only include files matching the include/exclude patterns
+ *
+ * @param diff - The full PR diff
+ * @param includePaths - Glob patterns for files to include
+ * @param excludePaths - Glob patterns for files to exclude
+ * @returns Filtered diff
+ */
+function filterDiffByPaths(
+  diff: string,
+  includePaths?: string[],
+  excludePaths?: string[]
+): string {
+  // Split the diff into sections by file
+  const diffSections = diff.split("diff --git ");
+  const filteredSections: string[] = [];
+
+  // Skip the first empty section if it exists
+  const sectionsToProcess = diffSections[0]
+    ? diffSections
+    : diffSections.slice(1);
+
+  for (const section of sectionsToProcess) {
+    if (!section.trim()) continue;
+
+    // Add the "diff --git " prefix back for all non-empty sections except the first
+    // which might be a header
+    const processedSection =
+      section === diffSections[0] && !diff.startsWith("diff --git ")
+        ? section
+        : "diff --git " + section;
+
+    // Extract the file path from the diff section
+    const filePathMatch = processedSection.match(/diff --git a\/(.*?) b\//);
+    if (!filePathMatch) continue;
+
+    const filePath = filePathMatch[1];
+
+    // Check if the file should be included or excluded
+    if (shouldIncludeFile(filePath, includePaths, excludePaths)) {
+      filteredSections.push(processedSection);
+    }
+  }
+
+  return filteredSections.join("");
+}
+
+/**
+ * Filter comments to only include those for files matching the include/exclude patterns
+ *
+ * @param comments - All comments
+ * @param includePaths - Glob patterns for files to include
+ * @param excludePaths - Glob patterns for files to exclude
+ * @returns Filtered comments
+ */
+function filterCommentsByPaths(
+  comments: Comment[],
+  includePaths?: string[],
+  excludePaths?: string[]
+): Comment[] {
+  return comments.filter((comment) => {
+    // Keep PR-level comments
+    if (comment.type !== "line") return true;
+
+    // For line comments, check the file path
+    return shouldIncludeFile(comment.file, includePaths, excludePaths);
+  });
+}
+
+/**
+ * Determine if a file should be included based on the include/exclude patterns
+ *
+ * @param filePath - Path of the file
+ * @param includePaths - Glob patterns for files to include
+ * @param excludePaths - Glob patterns for files to exclude
+ * @returns Whether the file should be included
+ */
+function shouldIncludeFile(
+  filePath: string,
+  includePaths?: string[],
+  excludePaths?: string[]
+): boolean {
+  // If no include paths are specified, include everything by default
+  const includeFile =
+    !includePaths?.length || micromatch.isMatch(filePath, includePaths);
+
+  // If no exclude paths are specified, exclude nothing
+  const excludeFile = excludePaths?.length
+    ? micromatch.isMatch(filePath, excludePaths)
+    : false;
+
+  // Include the file if it matches include patterns and doesn't match exclude patterns
+  return includeFile && !excludeFile;
+}
+
+/**
  * Generate a prompt for the LLM based on the diff and rules
- * 
+ *
  * @param diff - The PR diff
  * @param rules - Configuration rules
  * @returns The formatted prompt
@@ -90,7 +212,11 @@ Please follow these guidelines:
      "summary": "Brief summary of your overall assessment"
    }
 
-${rules.customInstructions ? `Additional instructions: ${rules.customInstructions}` : ''}
+${
+  rules.customInstructions
+    ? `Additional instructions: ${rules.customInstructions}`
+    : ""
+}
 `;
 
   // Combine the system prompt with the diff
@@ -99,43 +225,52 @@ ${rules.customInstructions ? `Additional instructions: ${rules.customInstruction
 
 /**
  * Call the OpenAI API with the prepared prompt
- * 
+ *
  * @param prompt - The formatted prompt
  * @param apiKey - API key for OpenAI
  * @param model - Model name to use
  * @returns The LLM response
  */
-async function callOpenAIApi(prompt: string, apiKey: string, model: string): Promise<string> {
+async function callOpenAIApi(
+  prompt: string,
+  apiKey: string,
+  model: string
+): Promise<string> {
   try {
     core.debug(`Calling OpenAI API with model: ${model}`);
 
     const response = await axios.post<OpenAIResponse>(
-      'https://api.openai.com/v1/chat/completions',
+      "https://api.openai.com/v1/chat/completions",
       {
         model: model,
         messages: [
           {
             role: "system",
-            content: "You are a code review assistant that analyzes PR diffs and provides helpful comments."
+            content:
+              "You are a code review assistant that analyzes PR diffs and provides helpful comments.",
           },
           {
             role: "user",
-            content: prompt
-          }
+            content: prompt,
+          },
         ],
         temperature: 0.3,
-        max_tokens: 2000
+        max_tokens: 2000,
       },
       {
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        }
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
       }
     );
 
-    if (!response.data.choices || !response.data.choices[0] || !response.data.choices[0].message) {
-      throw new Error('Invalid response format from OpenAI API');
+    if (
+      !response.data.choices ||
+      !response.data.choices[0] ||
+      !response.data.choices[0].message
+    ) {
+      throw new Error("Invalid response format from OpenAI API");
     }
 
     return response.data.choices[0].message.content.trim();
@@ -145,7 +280,11 @@ async function callOpenAIApi(prompt: string, apiKey: string, model: string): Pro
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
         if (axiosError.response) {
-          core.error(`Status: ${axiosError.response.status}, Data: ${JSON.stringify(axiosError.response.data)}`);
+          core.error(
+            `Status: ${axiosError.response.status}, Data: ${JSON.stringify(
+              axiosError.response.data
+            )}`
+          );
         }
       }
     } else {
@@ -157,39 +296,47 @@ async function callOpenAIApi(prompt: string, apiKey: string, model: string): Pro
 
 /**
  * Call the Anthropic API with the prepared prompt
- * 
+ *
  * @param prompt - The formatted prompt
  * @param apiKey - API key for Anthropic
  * @param model - Model name to use
  * @returns The LLM response
  */
-async function callAnthropicApi(prompt: string, apiKey: string, model: string): Promise<string> {
+async function callAnthropicApi(
+  prompt: string,
+  apiKey: string,
+  model: string
+): Promise<string> {
   try {
     core.debug(`Calling Anthropic API with model: ${model}`);
 
     const response = await axios.post<AnthropicResponse>(
-      'https://api.anthropic.com/v1/messages',
+      "https://api.anthropic.com/v1/messages",
       {
         model: model,
         max_tokens: 2000,
         messages: [
           {
             role: "user",
-            content: prompt
-          }
-        ]
+            content: prompt,
+          },
+        ],
       },
       {
         headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01'
-        }
+          "Content-Type": "application/json",
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
       }
     );
 
-    if (!response.data.content || !response.data.content[0] || !response.data.content[0].text) {
-      throw new Error('Invalid response format from Anthropic API');
+    if (
+      !response.data.content ||
+      !response.data.content[0] ||
+      !response.data.content[0].text
+    ) {
+      throw new Error("Invalid response format from Anthropic API");
     }
 
     return response.data.content[0].text;
@@ -199,7 +346,11 @@ async function callAnthropicApi(prompt: string, apiKey: string, model: string): 
       if (axios.isAxiosError(error)) {
         const axiosError = error as AxiosError;
         if (axiosError.response) {
-          core.error(`Status: ${axiosError.response.status}, Data: ${JSON.stringify(axiosError.response.data)}`);
+          core.error(
+            `Status: ${axiosError.response.status}, Data: ${JSON.stringify(
+              axiosError.response.data
+            )}`
+          );
         }
       }
     } else {
@@ -211,7 +362,7 @@ async function callAnthropicApi(prompt: string, apiKey: string, model: string): 
 
 /**
  * Parse the LLM response into structured comments
- * 
+ *
  * @param response - The raw LLM response
  * @returns Structured analysis results
  */
@@ -227,16 +378,20 @@ function parseResponse(response: string): AnalysisResults {
     }
 
     // Try to parse the response as JSON
-    const parsedResponse = JSON.parse(cleanedResponse) as Partial<AnalysisResults>;
+    const parsedResponse = JSON.parse(
+      cleanedResponse
+    ) as Partial<AnalysisResults>;
 
     // Validate the response structure
     if (!parsedResponse.comments || !Array.isArray(parsedResponse.comments)) {
-      throw new Error('Invalid response format: missing or invalid comments array');
+      throw new Error(
+        "Invalid response format: missing or invalid comments array"
+      );
     }
 
     if (!parsedResponse.summary) {
-      core.warning('Response missing summary field');
-      parsedResponse.summary = 'No summary provided';
+      core.warning("Response missing summary field");
+      parsedResponse.summary = "No summary provided";
     }
 
     // Validate each comment
@@ -250,25 +405,28 @@ function parseResponse(response: string): AnalysisResults {
       }
 
       // Validate line comments
-      if (comment.type === 'line') {
-        if (!('file' in comment) || !('line' in comment)) {
-          core.warning(`Skipping invalid line comment: ${JSON.stringify(comment)}`);
+      if (comment.type === "line") {
+        if (!("file" in comment) || !("line" in comment)) {
+          core.warning(
+            `Skipping invalid line comment: ${JSON.stringify(comment)}`
+          );
           continue;
         }
 
         validComments.push({
-          type: 'line',
+          type: "line",
           file: comment.file as string,
           line: comment.line as number,
           body: comment.body,
-          commit_id: 'commit_id' in comment ? (comment.commit_id as string) : undefined
+          commit_id:
+            "commit_id" in comment ? (comment.commit_id as string) : undefined,
         });
       }
       // Validate PR comments
-      else if (comment.type === 'pr') {
+      else if (comment.type === "pr") {
         validComments.push({
-          type: 'pr',
-          body: comment.body
+          type: "pr",
+          body: comment.body,
         });
       }
       // Skip unknown comment types
@@ -279,7 +437,7 @@ function parseResponse(response: string): AnalysisResults {
 
     return {
       comments: validComments,
-      summary: parsedResponse.summary || 'No summary provided'
+      summary: parsedResponse.summary || "No summary provided",
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -290,7 +448,9 @@ function parseResponse(response: string): AnalysisResults {
     // Return a minimal valid structure
     return {
       comments: [],
-      summary: `Error parsing LLM response: ${error instanceof Error ? error.message : 'Unknown error'}`
+      summary: `Error parsing LLM response: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`,
     };
   }
-} 
+}

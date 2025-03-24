@@ -23,6 +23,8 @@ jobs:
           cat bunfig.toml || echo "File not found"
           echo "--- action.yml ---"
           cat action.yml || echo "File not found"
+          echo "--- .musashi (if exists) ---"
+          cat .musashi || echo "File not found"
           
       - name: Install dependencies
         run: bun install
@@ -36,12 +38,9 @@ jobs:
         uses: ./
         with:
           github-token: ${{ secrets.MUSASHI }}
-          repo-name: ${{ github.repository }}
+          # repo-name will use default (github.repository)
           pr-number: ${{ github.event.pull_request.number || 1 }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
           llm-provider: 'openai'
-          comment-rules: |
-            {
-              "customInstructions": "Focus on TypeScript best practices and code quality"
-            }
+          # Rules will be read from .musashi file if it exists
           log-level: "debug"
