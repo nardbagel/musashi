@@ -3,7 +3,10 @@ import * as github from "@actions/github";
 import * as fs from "fs";
 import * as path from "path";
 import { postComments } from "./github/comments";
-import { getPullRequestDiff } from "./github/pullRequest";
+import {
+  getPullRequestContext,
+  getPullRequestDiff,
+} from "./github/pullRequest";
 import { analyzeDiff } from "./llm/analyzer";
 import { CommentRules, LLMProvider } from "./types";
 import { cloneRepository } from "./utils/git";
@@ -75,13 +78,26 @@ async function run(): Promise<void> {
     const diff = await getPullRequestDiff(octokit, owner, repo, prNumber);
     core.info(`Retrieved PR diff (${diff.length} bytes)`);
 
+    // Get PR context (title, description, comments)
+    core.debug(`Fetching PR context to enhance analysis`);
+    const prContext = await getPullRequestContext(
+      octokit,
+      owner,
+      repo,
+      prNumber
+    );
+    core.info(
+      `Retrieved PR context: title, description, and ${prContext.comments.length} comments`
+    );
+
     // Analyze the diff using LLM
     const analysisResults = await analyzeDiff(
       diff,
       llmApiKey,
       commentRules,
       llmProvider as LLMProvider,
-      llmModel || undefined
+      llmModel || undefined,
+      prContext
     );
     core.info(
       `Analysis complete: ${analysisResults.comments.length} comments generated`

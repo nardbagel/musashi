@@ -19,6 +19,7 @@ import {
  * @param rules - Configuration rules for comment generation
  * @param provider - LLM provider ('openai' or 'anthropic')
  * @param model - Model name to use
+ * @param prContext - Optional PR context (title, description, comments)
  * @returns Analysis results with comments and summary
  */
 export async function analyzeDiff(
@@ -26,7 +27,8 @@ export async function analyzeDiff(
   apiKey: string,
   rules: CommentRules,
   provider: LLMProvider = "openai",
-  model?: string
+  model?: string,
+  prContext?: { title: string; description: string; comments: string[] }
 ): Promise<AnalysisResults> {
   try {
     core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
@@ -40,7 +42,7 @@ export async function analyzeDiff(
     }
 
     // Prepare the prompt for the LLM
-    const prompt = generatePrompt(diff, rules);
+    const prompt = generatePrompt(diff, rules, prContext);
 
     // Call the appropriate LLM API based on provider
     let response: string;
@@ -188,9 +190,14 @@ function shouldIncludeFile(
  *
  * @param diff - The PR diff
  * @param rules - Configuration rules
+ * @param prContext - Optional PR context (title, description, comments)
  * @returns The formatted prompt
  */
-function generatePrompt(diff: string, rules: CommentRules): string {
+function generatePrompt(
+  diff: string,
+  rules: CommentRules,
+  prContext?: { title: string; description: string; comments: string[] }
+): string {
   // Create a system prompt that instructs the LLM on how to analyze the code
   const systemPrompt = `
 You are a code review assistant. Your task is to analyze the following pull request diff and provide helpful comments.
@@ -219,8 +226,35 @@ ${
 }
 `;
 
-  // Combine the system prompt with the diff
-  return `${systemPrompt}\n\nHere is the pull request diff to analyze:\n\n${diff}`;
+  // Add PR context if available
+  let prContextText = "";
+  if (prContext) {
+    prContextText = `
+## Pull Request Information
+Title: ${prContext.title}
+
+Description:
+${prContext.description}
+
+${
+  prContext.comments.length > 0
+    ? `
+## Relevant Comments:
+${prContext.comments.join("\n\n")}
+`
+    : ""
+}
+
+Use this context to better understand the author's intentions, but focus your comments on the code changes.
+`;
+  }
+
+  // Combine the system prompt with context and diff
+  return `${systemPrompt}
+${prContextText}
+Here is the pull request diff to analyze:
+
+${diff}`;
 }
 
 /**

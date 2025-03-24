@@ -5,6 +5,7 @@ This GitHub Action analyzes pull request diffs using an LLM (Large Language Mode
 ## Features
 
 - Analyzes PR diffs using an LLM
+- Considers PR context (title, description, and comments) to better understand intent
 - Posts line-specific comments on code that could be improved
 - Provides a summary comment of the overall PR
 - Configurable rules for comment generation
