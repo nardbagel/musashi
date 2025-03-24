@@ -100,24 +100,37 @@ async function postComments(octokit, owner, repo, prNumber, comments) {
     }
 }
 /**
- * Find the position in the diff for a given line number
+ * Determine line and side parameters for creating a review comment
  *
  * @param patch - The file patch from GitHub API
  * @param targetLine - The line number to find
- * @returns The position in the diff
+ * @returns The line number in the diff and side information
  */
-function findPositionInDiff(patch, targetLine) {
+function getLineInfoFromDiff(patch, targetLine) {
     if (!patch)
         return null;
     const lines = patch.split("\n");
     let currentLine = 0;
-    let position = 0;
-    for (const line of lines) {
-        position++;
+    let diffLine = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Check if this is a hunk header line
+        if (line.startsWith("@@")) {
+            // Reset line count at each hunk header
+            const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+            if (match) {
+                // Get the starting line number in the new file for this hunk
+                const newStart = parseInt(match[1], 10);
+                currentLine = newStart - 1; // Adjust because we'll increment before using
+            }
+            continue;
+        }
         if (line.startsWith("+") || line.startsWith(" ")) {
             currentLine++;
             if (currentLine === targetLine) {
-                return position;
+                // Calculate the line number in the diff, factoring in hunk headers
+                diffLine = i + 1; // +1 because line numbers are 1-indexed
+                return { line: diffLine, side: "RIGHT" };
             }
         }
     }
@@ -135,10 +148,10 @@ function findPositionInDiff(patch, targetLine) {
 async function postLineComment(octokit, owner, repo, prNumber, comment, commitSha, patch) {
     try {
         core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
-        // Find the position in the diff
-        const position = findPositionInDiff(patch, comment.line);
-        if (!position) {
-            core.warning(`Could not find position for line ${comment.line} in file ${comment.file}`);
+        // Get line and side information
+        const lineInfo = getLineInfoFromDiff(patch, comment.line);
+        if (!lineInfo) {
+            core.warning(`Could not find line information for line ${comment.line} in file ${comment.file}`);
             return;
         }
         const params = {
@@ -148,8 +161,8 @@ async function postLineComment(octokit, owner, repo, prNumber, comment, commitSh
             body: comment.body,
             commit_id: commitSha,
             path: comment.file,
-            position,
-            side: "RIGHT",
+            line: lineInfo.line,
+            side: lineInfo.side,
         };
         await octokit.rest.pulls.createReviewComment(params);
     }

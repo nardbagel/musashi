@@ -81,28 +81,43 @@ export async function postComments(
 }
 
 /**
- * Find the position in the diff for a given line number
+ * Determine line and side parameters for creating a review comment
  *
  * @param patch - The file patch from GitHub API
  * @param targetLine - The line number to find
- * @returns The position in the diff
+ * @returns The line number in the diff and side information
  */
-function findPositionInDiff(
+function getLineInfoFromDiff(
   patch: string | undefined,
   targetLine: number
-): number | null {
+): { line: number; side: "RIGHT" } | null {
   if (!patch) return null;
 
   const lines = patch.split("\n");
   let currentLine = 0;
-  let position = 0;
+  let diffLine = 0;
 
-  for (const line of lines) {
-    position++;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Check if this is a hunk header line
+    if (line.startsWith("@@")) {
+      // Reset line count at each hunk header
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        // Get the starting line number in the new file for this hunk
+        const newStart = parseInt(match[1], 10);
+        currentLine = newStart - 1; // Adjust because we'll increment before using
+      }
+      continue;
+    }
+
     if (line.startsWith("+") || line.startsWith(" ")) {
       currentLine++;
       if (currentLine === targetLine) {
-        return position;
+        // Calculate the line number in the diff, factoring in hunk headers
+        diffLine = i + 1; // +1 because line numbers are 1-indexed
+        return { line: diffLine, side: "RIGHT" };
       }
     }
   }
@@ -131,11 +146,11 @@ async function postLineComment(
   try {
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
 
-    // Find the position in the diff
-    const position = findPositionInDiff(patch, comment.line);
-    if (!position) {
+    // Get line and side information
+    const lineInfo = getLineInfoFromDiff(patch, comment.line);
+    if (!lineInfo) {
       core.warning(
-        `Could not find position for line ${comment.line} in file ${comment.file}`
+        `Could not find line information for line ${comment.line} in file ${comment.file}`
       );
       return;
     }
@@ -147,8 +162,8 @@ async function postLineComment(
       body: comment.body,
       commit_id: commitSha,
       path: comment.file,
-      position,
-      side: "RIGHT" as const,
+      line: lineInfo.line,
+      side: lineInfo.side,
     };
 
     await octokit.rest.pulls.createReviewComment(params);
