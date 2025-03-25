@@ -168,6 +168,11 @@ function generatePrompt(
   rules: CommentRules,
   prContext?: PRContext
 ): string {
+  // Log PR context if available
+  if (prContext) {
+    core.info(diff);
+  }
+
   // Create a system prompt that instructs the LLM on how to analyze the code
   const systemPrompt = `
 ${ROOT_PROMPT}
