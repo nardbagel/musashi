@@ -49,8 +49,9 @@ export async function analyzeDiff(
       core.debug(`Filtered diff to ${diff.length} bytes after excluding files`);
     }
 
-    // Prepare the prompt for the LLM
-    const prompt = generatePrompt(diff, rules, prContext);
+    // Format the diff with line numbers before creating the prompt
+    const formattedDiff = formatDiffWithLineNumbers(diff);
+    const prompt = generatePrompt(formattedDiff, rules, prContext);
 
     // Call the appropriate LLM API based on provider
     let response: string;
@@ -431,4 +432,42 @@ function parseResponse(response: string): AnalysisResults {
       }`,
     };
   }
+}
+
+function formatDiffWithLineNumbers(diff: string): string {
+  const lines = diff.split("\n");
+  let currentLine = 0;
+  let formattedDiff = "";
+
+  for (const line of lines) {
+    // Track file changes
+    if (line.startsWith("diff --git")) {
+      formattedDiff += line + "\n";
+      continue;
+    }
+
+    // Reset line count at each hunk header
+    if (line.startsWith("@@")) {
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        currentLine = parseInt(match[1], 10) - 1;
+      }
+      formattedDiff += line + "\n";
+      continue;
+    }
+
+    // Add line numbers to actual code lines
+    if (line.startsWith("+") || line.startsWith(" ")) {
+      currentLine++;
+      // Add line number prefix for all lines, but mark changed ones specially
+      const prefix = line.startsWith("+") ? "+" : " ";
+      formattedDiff += `${prefix}[${currentLine}] ${line.slice(1)}\n`;
+    } else if (line.startsWith("-")) {
+      // Keep removed lines as is
+      formattedDiff += line + "\n";
+    } else {
+      formattedDiff += line + "\n";
+    }
+  }
+  return formattedDiff;
 }

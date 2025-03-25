@@ -22,11 +22,12 @@ Your role is to provide thorough, constructive feedback that helps improve code 
 
 8. If you are unsure about a comment, don't make it.
 
-IMPORTANT: Only comment on lines that are actually changed in the diff (lines starting with + or -)
+IMPORTANT: Only comment on changed lines (starting with +)
 
-IMPORTANT: When referencing line numbers in your comments, use the actual file line numbers from the @@ headers in the diff. For example, if you see:
-   @@ -10,6 +10,8 @@ 
-   This means the following lines start at line 10 in the new file.
+IMPORTANT: Use the exact line number shown in [123] format at the start of each line. For example:
+   +[50] // Addition on line 50
+   -[49] // Removal on line 49
+    [51] // Unchanged line
 
 IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
    {
@@ -34,7 +35,8 @@ IMPORTANT: Format your response as raw JSON without any markdown formatting, cod
        {
          "type": "line",  // "line" for file-specific comments, "pr" for general comments
          "file": "path/to/file",  // Only for "line" type
-         "line": 42,  // Line number, only for "line" type
+         "line": 42,  // Line number from [42] in the line you're commenting on
+         "side": "RIGHT",  // "RIGHT" for additions, "LEFT" for deletions
          "body": "Your comment text here"
        }
      ],

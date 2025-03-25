@@ -80,17 +80,15 @@ export async function postComments(
   }
 }
 
-/**
- * Determine line and side parameters for creating a review comment
- *
- * @param patch - The file patch from GitHub API
- * @param targetLine - The line number to find
- * @returns The line number in the diff and side information
- */
+interface DiffLineInfo {
+  line: number;
+  side: "LEFT" | "RIGHT";
+}
+
 function getLineInfoFromDiff(
   patch: string | undefined,
   targetLine: number
-): { line: number; side: "RIGHT" } | null {
+): DiffLineInfo | null {
   if (!patch) return null;
 
   const lines = patch.split("\n");
@@ -100,24 +98,22 @@ function getLineInfoFromDiff(
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
-    // Check if this is a hunk header line
     if (line.startsWith("@@")) {
-      // Reset line count at each hunk header
       const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (match) {
-        // Get the starting line number in the new file for this hunk
-        const newStart = parseInt(match[1], 10);
-        currentLine = newStart - 1; // Adjust because we'll increment before using
+        currentLine = parseInt(match[1], 10) - 1;
       }
       continue;
     }
 
-    if (line.startsWith("+") || line.startsWith(" ")) {
+    // Now we check both + and - lines
+    if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
       currentLine++;
       if (currentLine === targetLine) {
-        // Calculate the line number in the diff, factoring in hunk headers
-        diffLine = i + 1; // +1 because line numbers are 1-indexed
-        return { line: diffLine, side: "RIGHT" };
+        diffLine = i + 1;
+        // Determine side based on the line prefix
+        const side = line.startsWith("-") ? "LEFT" : "RIGHT";
+        return { line: diffLine, side };
       }
     }
   }
