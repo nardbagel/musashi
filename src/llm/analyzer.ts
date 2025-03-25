@@ -1,6 +1,7 @@
 import * as core from "@actions/core";
 import axios from "axios";
 import micromatch from "micromatch";
+import { PRContext } from "../github/pullRequest";
 import {
   AnalysisResults,
   AnthropicResponse,
@@ -19,6 +20,7 @@ import {
  * @param rules - Configuration rules for comment generation
  * @param provider - LLM provider ('openai' or 'anthropic')
  * @param model - Model name to use
+ * @param prContext - Pull request context including existing comments
  * @returns Analysis results with comments and summary
  */
 export async function analyzeDiff(
@@ -26,7 +28,8 @@ export async function analyzeDiff(
   apiKey: string,
   rules: CommentRules,
   provider: LLMProvider = "openai",
-  model?: string
+  model?: string,
+  prContext?: PRContext
 ): Promise<AnalysisResults> {
   try {
     core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
@@ -40,7 +43,7 @@ export async function analyzeDiff(
     }
 
     // Prepare the prompt for the LLM
-    const prompt = generatePrompt(diff, rules);
+    const prompt = generatePrompt(diff, rules, prContext);
 
     // Call the appropriate LLM API based on provider
     let response: string;
@@ -188,18 +191,45 @@ function shouldIncludeFile(
  *
  * @param diff - The PR diff
  * @param rules - Configuration rules
+ * @param prContext - Pull request context including existing comments
  * @returns The formatted prompt
  */
-function generatePrompt(diff: string, rules: CommentRules): string {
+function generatePrompt(
+  diff: string,
+  rules: CommentRules,
+  prContext?: PRContext
+): string {
   // Create a system prompt that instructs the LLM on how to analyze the code
   const systemPrompt = `
 You are a code review assistant. Your task is to analyze the following pull request diff and provide helpful comments.
+
+${
+  prContext
+    ? `
+Pull Request Information:
+Title: ${prContext.title}
+Description: ${prContext.description}
+
+Existing Comments:
+Line Comments:
+${prContext.existingComments.lineComments
+  .map((c) => `- ${c.path}:${c.line}: ${c.body}`)
+  .join("\n")}
+
+PR Comments:
+${prContext.existingComments.prComments.map((c) => `- ${c.body}`).join("\n")}
+
+Please consider the existing comments above and avoid making similar comments. Instead, provide new insights or expand upon existing comments if you have additional valuable information.
+`
+    : ""
+}
 
 Please follow these guidelines:
 1. Focus on code quality, potential bugs, security issues, and performance concerns
 2. Be specific and actionable in your feedback
 3. Use a constructive and helpful tone
-4. IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
+4. Avoid repeating points that have already been made in existing comments
+5. IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
    {
      "comments": [
        {
