@@ -126,6 +126,40 @@ function getLineInfoFromDiff(
 }
 
 /**
+ * Validate that a line number exists in the diff and is part of a change
+ */
+function validateLineInDiff(
+  patch: string | undefined,
+  targetLine: number
+): boolean {
+  if (!patch) return false;
+
+  const lines = patch.split("\n");
+  let currentLine = 0;
+
+  for (const line of lines) {
+    // Check if this is a hunk header line
+    if (line.startsWith("@@")) {
+      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      if (match) {
+        currentLine = parseInt(match[1], 10) - 1;
+      }
+      continue;
+    }
+
+    if (line.startsWith("+") || line.startsWith(" ")) {
+      currentLine++;
+      // If this is the target line and it's a changed line (starts with +)
+      if (currentLine === targetLine && line.startsWith("+")) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+/**
  * Post a line-specific comment
  *
  * @param octokit - Initialized Octokit client
@@ -159,17 +193,26 @@ async function postLineComment(
     body: comment.body,
     commit_id: commitSha,
     path: comment.file,
-    line: 0, // Will be set later if lineInfo is found
+    line: 0,
     side: "RIGHT",
   };
+
   try {
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
+
+    // First validate that the line exists in the diff and is a changed line
+    if (!validateLineInDiff(patch, comment.line)) {
+      core.info(
+        `Skipping comment for ${comment.file}:${comment.line} - line is not changed in the diff`
+      );
+      return;
+    }
 
     // Get line and side information
     const lineInfo = getLineInfoFromDiff(patch, comment.line);
     if (!lineInfo) {
-      core.warning(
-        `Could not find line information for line ${comment.line} in file ${comment.file}`
+      core.info(
+        `Skipping comment for ${comment.file}:${comment.line} - could not map to diff line`
       );
       return;
     }
