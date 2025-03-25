@@ -171,28 +171,6 @@ function generatePrompt(
   const systemPrompt = `
 ${ROOT_PROMPT}
 
-Please follow these guidelines:
-1. Focus on code quality, potential bugs, security issues, and performance concerns
-2. Be specific and actionable in your feedback
-3. Use a constructive and helpful tone
-4. Avoid repeating points that have already been made in existing comments
-5. IMPORTANT: Only comment on lines that are actually changed in the diff (lines starting with + or -)
-6. IMPORTANT: When referencing line numbers in your comments, use the actual file line numbers from the @@ headers in the diff. For example, if you see:
-   @@ -10,6 +10,8 @@ 
-   This means the following lines start at line 10 in the new file.
-7. IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
-   {
-     "comments": [
-       {
-         "type": "line",  // "line" for file-specific comments, "pr" for general comments
-         "file": "path/to/file",  // Only for "line" type
-         "line": 42,  // Line number from the actual file (based on @@ headers), not the diff line number
-         "body": "Your comment text here"
-       }
-     ],
-     "summary": "Brief summary of your overall assessment"
-   }
-
 ${
   rules
     ? `Additional instructions specific to doing PR reviews in this git repository: ${rules}`
