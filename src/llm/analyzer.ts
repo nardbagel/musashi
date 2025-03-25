@@ -457,7 +457,8 @@ function parseResponse(response: string): AnalysisResults {
 
 function formatDiffWithLineNumbers(diff: string): string {
   const lines = diff.split("\n");
-  let currentLine = 0;
+  let oldLine = 0;
+  let newLine = 0;
   let formattedDiff = "";
 
   for (const line of lines) {
@@ -466,22 +467,28 @@ function formatDiffWithLineNumbers(diff: string): string {
       continue;
     }
 
-    // Reset line count at each hunk header
     if (line.startsWith("@@")) {
-      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (match) {
-        // Important: Start from the actual line number in the file
-        currentLine = parseInt(match[1], 10) - 1;
+        oldLine = parseInt(match[1], 10) - 1;
+        newLine = parseInt(match[2], 10) - 1;
       }
       formattedDiff += line + "\n";
       continue;
     }
 
-    if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
-      currentLine++;
-      // Add line number prefix but keep the +/- indicator
-      const prefix = line[0]; // Keep the +/- or space
-      formattedDiff += `${prefix}[${currentLine}] ${line.slice(1)}\n`;
+    const prefix = line[0];
+
+    if (prefix === " ") {
+      oldLine++;
+      newLine++;
+      formattedDiff += `${prefix}[${newLine}] ${line.slice(1)}\n`;
+    } else if (prefix === "+") {
+      newLine++;
+      formattedDiff += `${prefix}[${newLine}] ${line.slice(1)}\n`;
+    } else if (prefix === "-") {
+      oldLine++;
+      formattedDiff += `${prefix}[${oldLine}] ${line.slice(1)}\n`;
     } else {
       formattedDiff += line + "\n";
     }
