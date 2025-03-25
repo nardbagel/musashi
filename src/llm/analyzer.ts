@@ -440,7 +440,6 @@ function formatDiffWithLineNumbers(diff: string): string {
   let formattedDiff = "";
 
   for (const line of lines) {
-    // Track file changes
     if (line.startsWith("diff --git")) {
       formattedDiff += line + "\n";
       continue;
@@ -450,21 +449,18 @@ function formatDiffWithLineNumbers(diff: string): string {
     if (line.startsWith("@@")) {
       const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (match) {
+        // Important: Start from the actual line number in the file
         currentLine = parseInt(match[1], 10) - 1;
       }
       formattedDiff += line + "\n";
       continue;
     }
 
-    // Add line numbers to actual code lines
-    if (line.startsWith("+") || line.startsWith(" ")) {
+    if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
       currentLine++;
-      // Add line number prefix for all lines, but mark changed ones specially
-      const prefix = line.startsWith("+") ? "+" : " ";
+      // Add line number prefix but keep the +/- indicator
+      const prefix = line[0]; // Keep the +/- or space
       formattedDiff += `${prefix}[${currentLine}] ${line.slice(1)}\n`;
-    } else if (line.startsWith("-")) {
-      // Keep removed lines as is
-      formattedDiff += line + "\n";
     } else {
       formattedDiff += line + "\n";
     }
