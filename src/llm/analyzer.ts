@@ -37,9 +37,15 @@ export async function analyzeDiff(
   try {
     core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
 
+    // Always exclude .musashi file
+    const allExcludePatterns = [".musashi", ...excludeFiles];
+    core.debug(
+      `Excluding files matching patterns: ${allExcludePatterns.join(", ")}`
+    );
+
     // Filter out excluded files from the diff
-    if (excludeFiles.length > 0) {
-      diff = filterDiffByExcludePatterns(diff, excludeFiles);
+    if (allExcludePatterns.length > 0) {
+      diff = filterDiffByExcludePatterns(diff, allExcludePatterns);
       core.debug(`Filtered diff to ${diff.length} bytes after excluding files`);
     }
 
@@ -67,10 +73,10 @@ export async function analyzeDiff(
     const analysisResults = parseResponse(response);
 
     // Filter out comments for excluded files
-    if (excludeFiles.length > 0) {
+    if (allExcludePatterns.length > 0) {
       analysisResults.comments = filterCommentsByExcludePatterns(
         analysisResults.comments,
-        excludeFiles
+        allExcludePatterns
       );
       core.debug(
         `Filtered to ${analysisResults.comments.length} comments after excluding files`
