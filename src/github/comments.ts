@@ -127,14 +127,14 @@ function getLineInfoFromDiff(
 function validateLineInDiff(
   patch: string | undefined,
   targetLine: number
-): boolean {
-  if (!patch) return false;
+): { isValid: boolean; codeLine?: string } {
+  if (!patch) return { isValid: false };
 
   const lines = patch.split("\n");
   let currentLine = 0;
+  let foundLine: string | undefined;
 
   for (const line of lines) {
-    // Check if this is a hunk header line
     if (line.startsWith("@@")) {
       const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (match) {
@@ -145,17 +145,16 @@ function validateLineInDiff(
 
     if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
       currentLine++;
-      // If this is the target line and it's a changed line (starts with + or -)
-      if (
-        currentLine === targetLine &&
-        (line.startsWith("+") || line.startsWith("-"))
-      ) {
-        return true;
+      if (currentLine === targetLine) {
+        foundLine = line;
+        if (line.startsWith("+") || line.startsWith("-")) {
+          return { isValid: true, codeLine: line };
+        }
       }
     }
   }
 
-  return false;
+  return { isValid: false, codeLine: foundLine };
 }
 
 /**
@@ -200,9 +199,14 @@ async function postLineComment(
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
 
     // First validate that the line exists in the diff and is a changed line
-    if (!validateLineInDiff(patch, comment.line)) {
+    const validation = validateLineInDiff(patch, comment.line);
+    if (!validation.isValid) {
       core.info(
-        `Skipping comment for ${comment.file}:${comment.line} - line is not changed in the diff`
+        `Skipping comment for ${comment.file}:${
+          comment.line
+        } - line is not changed in the diff\nLine content: ${
+          validation.codeLine || "Line not found in diff"
+        }`
       );
       return;
     }
@@ -211,7 +215,11 @@ async function postLineComment(
     const lineInfo = getLineInfoFromDiff(patch, comment.line);
     if (!lineInfo) {
       core.info(
-        `Skipping comment for ${comment.file}:${comment.line} - could not map to diff line`
+        `Skipping comment for ${comment.file}:${
+          comment.line
+        } - could not map to diff line\nLine content: ${
+          validation.codeLine || "Line not found in diff"
+        }`
       );
       return;
     }
