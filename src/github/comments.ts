@@ -136,17 +136,20 @@ function validateLineInDiff(
   for (const line of lines) {
     // Check if this is a hunk header line
     if (line.startsWith("@@")) {
-      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (match) {
         currentLine = parseInt(match[1], 10) - 1;
       }
       continue;
     }
 
-    if (line.startsWith("+") || line.startsWith(" ")) {
+    if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
       currentLine++;
-      // If this is the target line and it's a changed line (starts with +)
-      if (currentLine === targetLine && line.startsWith("+")) {
+      // If this is the target line and it's a changed line (starts with + or -)
+      if (
+        currentLine === targetLine &&
+        (line.startsWith("+") || line.startsWith("-"))
+      ) {
         return true;
       }
     }
