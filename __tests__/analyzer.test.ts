@@ -251,4 +251,84 @@ index 8901234..5678901 100644
     }
     expect(result.comments[1].type).toBe("pr");
   });
+
+  test("analyzeDiff should always exclude .musashi files", async () => {
+    // Mock the axios response for OpenAI
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                comments: [
+                  {
+                    type: "line",
+                    file: "test.js",
+                    line: 2,
+                    body: "Comment 1",
+                  },
+                  {
+                    type: "line",
+                    file: ".musashi",
+                    line: 1,
+                    body: "Comment 2",
+                  },
+                  {
+                    type: "pr",
+                    body: "General comment",
+                  },
+                ],
+                summary: "Test summary",
+              }),
+            },
+          },
+        ],
+      },
+    });
+
+    // Sample diff with .musashi file
+    const diff = `diff --git a/test.js b/test.js
+index 1234567..abcdefg 100644
+--- a/test.js
++++ b/test.js
+@@ -1,1 +1,1 @@
+-old
++new
+diff --git a/.musashi b/.musashi
+index 8901234..5678901 100644
+--- a/.musashi
++++ b/.musashi
+@@ -1,1 +1,1 @@
+-Focus on performance
++Focus on security`;
+
+    const apiKey = "test-api-key";
+    const rules: CommentRules = "";
+    const excludeFiles: string[] = []; // No explicit exclude patterns
+
+    // Call the function with no exclude patterns
+    const result = await analyzeDiff(
+      diff,
+      apiKey,
+      rules,
+      "openai",
+      undefined,
+      undefined,
+      excludeFiles
+    );
+
+    // Verify that .musashi file was automatically excluded
+    expect(result.comments).toHaveLength(2); // 1 line comment + 1 PR comment
+    expect(result.comments[0].type).toBe("line");
+    if (result.comments[0].type === "line") {
+      expect(result.comments[0].file).toBe("test.js");
+    }
+    expect(result.comments[1].type).toBe("pr");
+
+    // Verify that no comments were made on .musashi file
+    const musashiComments = result.comments.filter(
+      (comment) => comment.type === "line" && comment.file === ".musashi"
+    );
+    expect(musashiComments).toHaveLength(0);
+  });
 });

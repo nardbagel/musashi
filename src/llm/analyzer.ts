@@ -176,7 +176,8 @@ Please follow these guidelines:
 2. Be specific and actionable in your feedback
 3. Use a constructive and helpful tone
 4. Avoid repeating points that have already been made in existing comments
-5. IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
+5. IMPORTANT: Only comment on lines that are actually changed in the diff (lines starting with + or -)
+6. IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
    {
      "comments": [
        {

@@ -143,6 +143,25 @@ async function postLineComment(
   commitSha: string,
   patch: string | undefined
 ): Promise<void> {
+  const params: {
+    owner: string;
+    repo: string;
+    pull_number: number;
+    body: string;
+    commit_id: string;
+    path: string;
+    line: number;
+    side: "RIGHT";
+  } = {
+    owner,
+    repo,
+    pull_number: prNumber,
+    body: comment.body,
+    commit_id: commitSha,
+    path: comment.file,
+    line: 0, // Will be set later if lineInfo is found
+    side: "RIGHT",
+  };
   try {
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
 
@@ -155,23 +174,23 @@ async function postLineComment(
       return;
     }
 
-    const params = {
-      owner,
-      repo,
-      pull_number: prNumber,
-      body: comment.body,
-      commit_id: commitSha,
-      path: comment.file,
-      line: lineInfo.line,
-      side: lineInfo.side,
-    };
-
+    params.line = lineInfo.line;
     await octokit.rest.pulls.createReviewComment(params);
   } catch (error) {
     if (error instanceof Error) {
-      core.warning(`Failed to post line comment: ${error.message}`);
+      core.warning(
+        `Failed to post line comment: ${
+          error.message
+        }\nParams: ${JSON.stringify(params, null, 2)}`
+      );
     } else {
-      core.warning(`Failed to post line comment: Unknown error`);
+      core.warning(
+        `Failed to post line comment: Unknown error\nParams: ${JSON.stringify(
+          params,
+          null,
+          2
+        )}`
+      );
     }
   }
 }
