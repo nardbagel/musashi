@@ -249,8 +249,35 @@ ${
 }
 `;
 
-  // Combine the system prompt with the diff
-  return `${systemPrompt}\n\nHere is the pull request diff to analyze:\n\n${diff}`;
+  // Add PR context if available
+  let prContextText = "";
+  if (prContext) {
+    prContextText = `
+## Pull Request Information
+Title: ${prContext.title}
+
+Description:
+${prContext.description}
+
+${
+  prContext.existingComments.lineComments.length > 0
+    ? `
+## Relevant Comments:
+${prContext.existingComments.lineComments.join("\n\n")}
+`
+    : ""
+}
+
+Use this context to better understand the author's intentions, but focus your comments on the code changes.
+`;
+  }
+
+  // Combine the system prompt with context and diff
+  return `${systemPrompt}
+${prContextText}
+Here is the pull request diff to analyze:
+
+${diff}`;
 }
 
 /**

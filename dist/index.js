@@ -100,24 +100,37 @@ async function postComments(octokit, owner, repo, prNumber, comments) {
     }
 }
 /**
- * Find the position in the diff for a given line number
+ * Determine line and side parameters for creating a review comment
  *
  * @param patch - The file patch from GitHub API
  * @param targetLine - The line number to find
- * @returns The position in the diff
+ * @returns The line number in the diff and side information
  */
-function findPositionInDiff(patch, targetLine) {
+function getLineInfoFromDiff(patch, targetLine) {
     if (!patch)
         return null;
     const lines = patch.split("\n");
     let currentLine = 0;
-    let position = 0;
-    for (const line of lines) {
-        position++;
+    let diffLine = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        // Check if this is a hunk header line
+        if (line.startsWith("@@")) {
+            // Reset line count at each hunk header
+            const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
+            if (match) {
+                // Get the starting line number in the new file for this hunk
+                const newStart = parseInt(match[1], 10);
+                currentLine = newStart - 1; // Adjust because we'll increment before using
+            }
+            continue;
+        }
         if (line.startsWith("+") || line.startsWith(" ")) {
             currentLine++;
             if (currentLine === targetLine) {
-                return position;
+                // Calculate the line number in the diff, factoring in hunk headers
+                diffLine = i + 1; // +1 because line numbers are 1-indexed
+                return { line: diffLine, side: "RIGHT" };
             }
         }
     }
@@ -135,10 +148,10 @@ function findPositionInDiff(patch, targetLine) {
 async function postLineComment(octokit, owner, repo, prNumber, comment, commitSha, patch) {
     try {
         core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
-        // Find the position in the diff
-        const position = findPositionInDiff(patch, comment.line);
-        if (!position) {
-            core.warning(`Could not find position for line ${comment.line} in file ${comment.file}`);
+        // Get line and side information
+        const lineInfo = getLineInfoFromDiff(patch, comment.line);
+        if (!lineInfo) {
+            core.warning(`Could not find line information for line ${comment.line} in file ${comment.file}`);
             return;
         }
         const params = {
@@ -148,8 +161,8 @@ async function postLineComment(octokit, owner, repo, prNumber, comment, commitSh
             body: comment.body,
             commit_id: commitSha,
             path: comment.file,
-            position,
-            side: "RIGHT",
+            line: lineInfo.line,
+            side: lineInfo.side,
         };
         await octokit.rest.pulls.createReviewComment(params);
     }
@@ -233,8 +246,85 @@ var __importStar = (this && this.__importStar) || (function () {
     };
 })();
 Object.defineProperty(exports, "__esModule", ({ value: true }));
+exports.getPullRequestContext = getPullRequestContext;
 exports.getPullRequestDiff = getPullRequestDiff;
 const core = __importStar(__nccwpck_require__(2186));
+/**
+ * Get detailed information about a pull request including description and comments
+ *
+ * @param octokit - Initialized Octokit client
+ * @param owner - Repository owner
+ * @param repo - Repository name
+ * @param prNumber - Pull request number
+ * @returns Object containing PR title, description, and comments
+ */
+async function getPullRequestContext(octokit, owner, repo, prNumber) {
+    try {
+        core.debug(`Fetching context for PR #${prNumber} in ${owner}/${repo}`);
+        // Get the PR details including title and body
+        const { data: pr } = await octokit.rest.pulls.get({
+            owner,
+            repo,
+            pull_number: prNumber,
+        });
+        // Get comments on the PR
+        const { data: issueComments } = await octokit.rest.issues.listComments({
+            owner,
+            repo,
+            issue_number: prNumber,
+        });
+        // Get review comments on the PR (comments on specific lines of code)
+        const { data: reviewComments } = await octokit.rest.pulls.listReviewComments({
+            owner,
+            repo,
+            pull_number: prNumber,
+        });
+        // Get reviews on the PR
+        const { data: reviews } = await octokit.rest.pulls.listReviews({
+            owner,
+            repo,
+            pull_number: prNumber,
+        });
+        // Extract all comments as strings
+        const issueCommentStrings = issueComments.map((comment) => { var _a; return `${((_a = comment.user) === null || _a === void 0 ? void 0 : _a.login) || "Unknown"}: ${comment.body || ""}`; });
+        const reviewCommentStrings = reviewComments.map((comment) => {
+            var _a;
+            return `${((_a = comment.user) === null || _a === void 0 ? void 0 : _a.login) || "Unknown"} (on ${comment.path || ""}:${comment.line || "?"}): ${comment.body || ""}`;
+        });
+        const reviewStrings = reviews
+            .filter((review) => review.body && review.body.trim().length > 0)
+            .map((review) => {
+            var _a;
+            return `${((_a = review.user) === null || _a === void 0 ? void 0 : _a.login) || "Unknown"} (${review.state || "unknown"}): ${review.body || ""}`;
+        });
+        // Combine all comments
+        const allComments = [
+            ...issueCommentStrings,
+            ...reviewCommentStrings,
+            ...reviewStrings,
+        ];
+        core.debug(`Found ${allComments.length} comments for PR #${prNumber}`);
+        return {
+            title: pr.title || "No title",
+            description: pr.body || "No description",
+            comments: allComments,
+        };
+    }
+    catch (error) {
+        if (error instanceof Error) {
+            core.error(`Failed to fetch PR context: ${error.message}`);
+        }
+        else {
+            core.error(`Failed to fetch PR context: Unknown error`);
+        }
+        // Return empty context instead of throwing to avoid breaking the main flow
+        return {
+            title: "Error fetching PR title",
+            description: "Error fetching PR description",
+            comments: ["Error fetching PR comments"],
+        };
+    }
+}
 /**
  * Get the diff for a specific pull request
  *
@@ -251,26 +341,28 @@ async function getPullRequestDiff(octokit, owner, repo, prNumber) {
         await octokit.rest.pulls.get({
             owner,
             repo,
-            pull_number: prNumber
+            pull_number: prNumber,
         });
         // Get the files changed in the PR
         const { data: files } = await octokit.rest.pulls.listFiles({
             owner,
             repo,
-            pull_number: prNumber
+            pull_number: prNumber,
         });
         core.debug(`PR #${prNumber} has ${files.length} changed files`);
         // Fetch the raw diff
-        const response = await octokit.request('GET /repos/{owner}/{repo}/pulls/{pull_number}', {
+        const response = await octokit.request("GET /repos/{owner}/{repo}/pulls/{pull_number}", {
             owner,
             repo,
             pull_number: prNumber,
             headers: {
-                accept: 'application/vnd.github.v3.diff'
-            }
+                accept: "application/vnd.github.v3.diff",
+            },
         });
         // The response.data is a string when using the diff media type
-        return typeof response.data === 'string' ? response.data : JSON.stringify(response.data);
+        return typeof response.data === "string"
+            ? response.data
+            : JSON.stringify(response.data);
     }
     catch (error) {
         if (error instanceof Error) {
@@ -383,8 +475,12 @@ async function run() {
         // Get PR diff
         const diff = await (0, pullRequest_1.getPullRequestDiff)(octokit, owner, repo, prNumber);
         core.info(`Retrieved PR diff (${diff.length} bytes)`);
+        // Get PR context (title, description, comments)
+        core.debug(`Fetching PR context to enhance analysis`);
+        const prContext = await (0, pullRequest_1.getPullRequestContext)(octokit, owner, repo, prNumber);
+        core.info(`Retrieved PR context: title, description, and ${prContext.comments.length} comments`);
         // Analyze the diff using LLM
-        const analysisResults = await (0, analyzer_1.analyzeDiff)(diff, llmApiKey, commentRules, llmProvider, llmModel || undefined);
+        const analysisResults = await (0, analyzer_1.analyzeDiff)(diff, llmApiKey, commentRules, llmProvider, llmModel || undefined, prContext);
         core.info(`Analysis complete: ${analysisResults.comments.length} comments generated`);
         // Post comments to the PR
         await (0, comments_1.postComments)(octokit, owner, repo, prNumber, analysisResults.comments);
@@ -479,9 +575,10 @@ const micromatch_1 = __importDefault(__nccwpck_require__(6228));
  * @param rules - Configuration rules for comment generation
  * @param provider - LLM provider ('openai' or 'anthropic')
  * @param model - Model name to use
+ * @param prContext - Optional PR context (title, description, comments)
  * @returns Analysis results with comments and summary
  */
-async function analyzeDiff(diff, apiKey, rules, provider = "openai", model) {
+async function analyzeDiff(diff, apiKey, rules, provider = "openai", model, prContext) {
     var _a, _b, _c, _d;
     try {
         core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
@@ -491,7 +588,7 @@ async function analyzeDiff(diff, apiKey, rules, provider = "openai", model) {
             core.debug(`Filtered diff to ${diff.length} bytes based on path patterns`);
         }
         // Prepare the prompt for the LLM
-        const prompt = generatePrompt(diff, rules);
+        const prompt = generatePrompt(diff, rules, prContext);
         // Call the appropriate LLM API based on provider
         let response;
         switch (provider.toLowerCase()) {
@@ -600,9 +697,10 @@ function shouldIncludeFile(filePath, includePaths, excludePaths) {
  *
  * @param diff - The PR diff
  * @param rules - Configuration rules
+ * @param prContext - Optional PR context (title, description, comments)
  * @returns The formatted prompt
  */
-function generatePrompt(diff, rules) {
+function generatePrompt(diff, rules, prContext) {
     // Create a system prompt that instructs the LLM on how to analyze the code
     const systemPrompt = `
 You are a code review assistant. Your task is to analyze the following pull request diff and provide helpful comments.
@@ -628,8 +726,32 @@ ${rules.customInstructions
         ? `Additional instructions: ${rules.customInstructions}`
         : ""}
 `;
-    // Combine the system prompt with the diff
-    return `${systemPrompt}\n\nHere is the pull request diff to analyze:\n\n${diff}`;
+    // Add PR context if available
+    let prContextText = "";
+    if (prContext) {
+        prContextText = `
+## Pull Request Information
+Title: ${prContext.title}
+
+Description:
+${prContext.description}
+
+${prContext.comments.length > 0
+            ? `
+## Relevant Comments:
+${prContext.comments.join("\n\n")}
+`
+            : ""}
+
+Use this context to better understand the author's intentions, but focus your comments on the code changes.
+`;
+    }
+    // Combine the system prompt with context and diff
+    return `${systemPrompt}
+${prContextText}
+Here is the pull request diff to analyze:
+
+${diff}`;
 }
 /**
  * Call the OpenAI API with the prepared prompt

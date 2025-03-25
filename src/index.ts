@@ -81,6 +81,18 @@ async function run(): Promise<void> {
     ]);
     core.info(`Retrieved PR context and diff (${diff.length} bytes)`);
 
+    // Get PR context (title, description, comments)
+    core.debug(`Fetching PR context to enhance analysis`);
+    const prContext = await getPullRequestContext(
+      octokit,
+      owner,
+      repo,
+      prNumber
+    );
+    core.info(
+      `Retrieved PR context: title, description, and ${prContext.comments.length} comments`
+    );
+
     // Analyze the diff using LLM
     const analysisResults = await analyzeDiff(
       diff,

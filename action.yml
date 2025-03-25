@@ -1,5 +1,5 @@
 name: "PR Comment Analysis"
-description: "Analyzes PR diffs and adds relevant comments using an LLM"
+description: "Analyzes PR diffs and adds relevant comments using an LLM, with awareness of PR context including descriptions and comments"
 author: "Your Organization"
 
 inputs:
