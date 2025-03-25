@@ -379,7 +379,13 @@ function parseResponse(response: string): AnalysisResults {
     for (const comment of parsedResponse.comments as Array<any>) {
       // Check if comment has required fields
       if (!comment.type || !comment.body) {
-        core.warning(`Skipping invalid comment: ${JSON.stringify(comment)}`);
+        core.warning(
+          `Skipping invalid comment due to missing required fields. Comment data: ${JSON.stringify(
+            comment,
+            null,
+            2
+          )}`
+        );
         continue;
       }
 
@@ -387,7 +393,11 @@ function parseResponse(response: string): AnalysisResults {
       if (comment.type === "line") {
         if (!("file" in comment) || !("line" in comment)) {
           core.warning(
-            `Skipping invalid line comment: ${JSON.stringify(comment)}`
+            `Skipping invalid line comment due to missing file or line. Comment data: ${JSON.stringify(
+              comment,
+              null,
+              2
+            )}`
           );
           continue;
         }
@@ -410,7 +420,13 @@ function parseResponse(response: string): AnalysisResults {
       }
       // Skip unknown comment types
       else {
-        core.warning(`Skipping comment with unknown type: ${comment.type}`);
+        core.warning(
+          `Skipping comment with unknown type. Comment data: ${JSON.stringify(
+            comment,
+            null,
+            2
+          )}`
+        );
       }
     }
 
