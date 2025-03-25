@@ -17,9 +17,9 @@ inputs:
     description: "API key for the LLM service"
     required: true
   comment-rules:
-    description: "JSON configuration for comment rules"
+    description: "String containing custom instructions for PR reviews"
     required: false
-    default: "{}"
+    default: ""
   log-level:
     description: "Logging level (debug, info, warn, error)"
     required: false

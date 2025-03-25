@@ -42,10 +42,8 @@ jobs:
 
 You can configure the LLM behavior by adding a `.musashi` file to the root of your repository:
 
-```json
-{
-  "customInstructions": "Focus on security issues and performance improvements"
-}
+```
+"Focus on security issues and performance improvements"
 ```
 
 ## Inputs
@@ -69,12 +67,9 @@ You can configure the action by adding a `.musashi` file to the root of your rep
 
 Example `.musashi` file:
 
-```json
-{
-  "customInstructions": "Focus on security issues, performance improvements, and adherence to TypeScript best practices",
-  "includePaths": ["src/**/*.ts", "src/**/*.tsx"],
-  "excludePaths": ["**/*.test.ts", "**/*.spec.ts"]
-}
+```
+Focus on security issues, performance improvements, and adherence to TypeScript best practices
+
 ```
 
 If the `.musashi` file is not found or cannot be parsed, the action will fall back to using the `comment-rules` input parameter.
@@ -90,10 +85,8 @@ If the `.musashi` file is not found or cannot be parsed, the action will fall ba
 
 You can customize the behavior of the LLM by providing a JSON object with the following properties:
 
-```json
-{
-  "customInstructions": "Additional instructions for the LLM"
-}
+```
+Additional instructions for the LLM
 ```
 
 ## Development

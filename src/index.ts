@@ -26,7 +26,7 @@ async function run(): Promise<void> {
       10
     );
     const llmApiKey = core.getInput("llm-api-key", { required: true });
-    const commentRulesInput = core.getInput("comment-rules") || "{}";
+    const commentRulesInput = core.getInput("comment-rules") || "";
     const logLevel = core.getInput("log-level") || "info";
     const llmProvider = core.getInput("llm-provider") || "openai";
     const llmModel = core.getInput("llm-model") || "";
@@ -51,26 +51,26 @@ async function run(): Promise<void> {
     core.info(`Repository cloned to ${repoPath}`);
 
     // Try to load .musashi file for rules
-    let commentRules: CommentRules = {};
+    let commentRules: CommentRules = "";
     const musashiPath = path.join(repoPath, ".musashi");
 
     if (fs.existsSync(musashiPath)) {
       try {
         const musashiContent = fs.readFileSync(musashiPath, "utf-8");
-        commentRules = JSON.parse(musashiContent) as CommentRules;
+        commentRules = musashiContent.trim();
         core.info(`Loaded comment rules from .musashi file`);
       } catch (error) {
         core.warning(
-          `Failed to parse .musashi file: ${
+          `Failed to read .musashi file: ${
             error instanceof Error ? error.message : "Unknown error"
           }`
         );
         // Fall back to input parameter if .musashi file is invalid
-        commentRules = JSON.parse(commentRulesInput) as CommentRules;
+        commentRules = commentRulesInput;
       }
     } else {
       // Fall back to input parameter if .musashi file doesn't exist
-      commentRules = JSON.parse(commentRulesInput) as CommentRules;
+      commentRules = commentRulesInput;
       core.debug(`No .musashi file found, using provided comment rules`);
     }
 
@@ -80,17 +80,8 @@ async function run(): Promise<void> {
       getPullRequestDiff(octokit, owner, repo, prNumber),
     ]);
     core.info(`Retrieved PR context and diff (${diff.length} bytes)`);
-
-    // Get PR context (title, description, comments)
-    core.debug(`Fetching PR context to enhance analysis`);
-    const prContext = await getPullRequestContext(
-      octokit,
-      owner,
-      repo,
-      prNumber
-    );
-    core.info(
-      `Retrieved PR context: title, description, and ${prContext.comments.length} comments`
+    core.debug(
+      `Found ${prContext.existingComments.lineComments.length} line comments and ${prContext.existingComments.prComments.length} PR comments`
     );
 
     // Analyze the diff using LLM
