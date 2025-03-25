@@ -177,4 +177,78 @@ index 1234567..abcdefg 100644
       analyzeDiff(diff, apiKey, rules, "invalid-provider" as LLMProvider)
     ).rejects.toThrow("Unsupported LLM provider: invalid-provider");
   });
+
+  test("analyzeDiff should exclude files matching patterns", async () => {
+    // Mock the axios response for OpenAI
+    mockedAxios.post.mockResolvedValueOnce({
+      data: {
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                comments: [
+                  {
+                    type: "line",
+                    file: "test.js",
+                    line: 2,
+                    body: "Comment 1",
+                  },
+                  {
+                    type: "line",
+                    file: "docs/README.md",
+                    line: 1,
+                    body: "Comment 2",
+                  },
+                  {
+                    type: "pr",
+                    body: "General comment",
+                  },
+                ],
+                summary: "Test summary",
+              }),
+            },
+          },
+        ],
+      },
+    });
+
+    // Sample diff with multiple files
+    const diff = `diff --git a/test.js b/test.js
+index 1234567..abcdefg 100644
+--- a/test.js
++++ b/test.js
+@@ -1,1 +1,1 @@
+-old
++new
+diff --git a/docs/README.md b/docs/README.md
+index 8901234..5678901 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -1,1 +1,1 @@
+-# Old title
++# New title`;
+
+    const apiKey = "test-api-key";
+    const rules: CommentRules = "";
+    const excludeFiles = ["*.md", "docs/**/*"];
+
+    // Call the function with exclude patterns
+    const result = await analyzeDiff(
+      diff,
+      apiKey,
+      rules,
+      "openai",
+      undefined,
+      undefined,
+      excludeFiles
+    );
+
+    // Verify that markdown files were excluded
+    expect(result.comments).toHaveLength(2); // 1 line comment + 1 PR comment
+    expect(result.comments[0].type).toBe("line");
+    if (result.comments[0].type === "line") {
+      expect(result.comments[0].file).toBe("test.js");
+    }
+    expect(result.comments[1].type).toBe("pr");
+  });
 });

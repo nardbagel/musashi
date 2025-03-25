@@ -30,6 +30,11 @@ async function run(): Promise<void> {
     const logLevel = core.getInput("log-level") || "info";
     const llmProvider = core.getInput("llm-provider") || "openai";
     const llmModel = core.getInput("llm-model") || "";
+    const excludeFiles = core
+      .getInput("exclude-files")
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
 
     // Configure logging based on log level
     configureLogging(logLevel);
@@ -91,7 +96,8 @@ async function run(): Promise<void> {
       commentRules,
       llmProvider as LLMProvider,
       llmModel || undefined,
-      prContext
+      prContext,
+      excludeFiles
     );
     core.info(
       `Analysis complete: ${analysisResults.comments.length} comments generated`

@@ -20,6 +20,10 @@ inputs:
     description: "String containing custom instructions for PR reviews"
     required: false
     default: ""
+  exclude-files:
+    description: "Comma-separated list of glob patterns for files to exclude from analysis (e.g. '*.md,test/**/*')"
+    required: false
+    default: ""
   log-level:
     description: "Logging level (debug, info, warn, error)"
     required: false

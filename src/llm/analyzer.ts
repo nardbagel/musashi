@@ -1,5 +1,6 @@
 import * as core from "@actions/core";
 import axios from "axios";
+import micromatch from "micromatch";
 import { PRContext } from "../github/pullRequest";
 import {
   AnalysisResults,
@@ -21,6 +22,7 @@ import { ROOT_PROMPT } from "./rootPrompt";
  * @param provider - LLM provider ('openai' or 'anthropic')
  * @param model - Model name to use
  * @param prContext - Pull request context including existing comments
+ * @param excludeFiles - List of files to exclude from analysis
  * @returns Analysis results with comments and summary
  */
 export async function analyzeDiff(
@@ -29,10 +31,17 @@ export async function analyzeDiff(
   rules: CommentRules,
   provider: LLMProvider = "openai",
   model?: string,
-  prContext?: PRContext
+  prContext?: PRContext,
+  excludeFiles: string[] = []
 ): Promise<AnalysisResults> {
   try {
     core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
+
+    // Filter out excluded files from the diff
+    if (excludeFiles.length > 0) {
+      diff = filterDiffByExcludePatterns(diff, excludeFiles);
+      core.debug(`Filtered diff to ${diff.length} bytes after excluding files`);
+    }
 
     // Prepare the prompt for the LLM
     const prompt = generatePrompt(diff, rules, prContext);
@@ -56,6 +65,18 @@ export async function analyzeDiff(
 
     // Parse the LLM response into structured comments
     const analysisResults = parseResponse(response);
+
+    // Filter out comments for excluded files
+    if (excludeFiles.length > 0) {
+      analysisResults.comments = filterCommentsByExcludePatterns(
+        analysisResults.comments,
+        excludeFiles
+      );
+      core.debug(
+        `Filtered to ${analysisResults.comments.length} comments after excluding files`
+      );
+    }
+
     core.debug(
       `Analysis generated ${analysisResults.comments.length} comments`
     );
@@ -68,6 +89,63 @@ export async function analyzeDiff(
     }
     throw error;
   }
+}
+
+/**
+ * Filter the diff to exclude files matching the exclude patterns
+ */
+function filterDiffByExcludePatterns(
+  diff: string,
+  excludePatterns: string[]
+): string {
+  // Split the diff into sections by file
+  const diffSections = diff.split("diff --git ");
+  const filteredSections: string[] = [];
+
+  // Skip the first empty section if it exists
+  const sectionsToProcess = diffSections[0]
+    ? diffSections
+    : diffSections.slice(1);
+
+  for (const section of sectionsToProcess) {
+    if (!section.trim()) continue;
+
+    // Add the "diff --git " prefix back for all non-empty sections except the first
+    // which might be a header
+    const processedSection =
+      section === diffSections[0] && !diff.startsWith("diff --git ")
+        ? section
+        : "diff --git " + section;
+
+    // Extract the file path from the diff section
+    const filePathMatch = processedSection.match(/diff --git a\/(.*?) b\//);
+    if (!filePathMatch) continue;
+
+    const filePath = filePathMatch[1];
+
+    // Skip if the file matches any exclude pattern
+    if (!micromatch.isMatch(filePath, excludePatterns)) {
+      filteredSections.push(processedSection);
+    }
+  }
+
+  return filteredSections.join("");
+}
+
+/**
+ * Filter comments to exclude those for files matching the exclude patterns
+ */
+function filterCommentsByExcludePatterns(
+  comments: Comment[],
+  excludePatterns: string[]
+): Comment[] {
+  return comments.filter((comment) => {
+    // Keep PR-level comments
+    if (comment.type !== "line") return true;
+
+    // For line comments, check if the file matches any exclude pattern
+    return !micromatch.isMatch(comment.file, excludePatterns);
+  });
 }
 
 /**
