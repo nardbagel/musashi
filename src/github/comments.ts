@@ -124,11 +124,8 @@ async function postLineComment(
     await octokit.rest.pulls.createReviewComment(params);
   } catch (error) {
     if (error instanceof Error) {
-      core.warning(
-        `Failed to post line comment: ${
-          error.message
-        }\nParams: ${JSON.stringify(params, null, 2)}`
-      );
+      core.warning(`Failed to post line comment: ${error.message}`);
+      core.warning(JSON.stringify(params, null, 2));
     } else {
       core.warning(
         `Failed to post line comment: Unknown error\nParams: ${JSON.stringify(
