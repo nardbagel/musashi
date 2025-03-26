@@ -125,7 +125,6 @@ async function postLineComment(
   } catch (error) {
     if (error instanceof Error) {
       core.warning(`Failed to post line comment: ${error.message}`);
-      core.warning(JSON.stringify(params, null, 2));
     } else {
       core.warning(
         `Failed to post line comment: Unknown error\nParams: ${JSON.stringify(
