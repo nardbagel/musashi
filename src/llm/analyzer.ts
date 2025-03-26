@@ -457,41 +457,31 @@ function parseResponse(response: string): AnalysisResults {
 
 function formatDiffWithLineNumbers(diff: string): string {
   const lines = diff.split("\n");
+  const result: string[] = [];
+
   let oldLine = 0;
   let newLine = 0;
-  let formattedDiff = "";
 
   for (const line of lines) {
-    if (line.startsWith("diff --git")) {
-      formattedDiff += line + "\n";
+    const hunkHeaderMatch = /^@@ -(\d+),?\d* \+(\d+),?\d* @@/.exec(line);
+    if (hunkHeaderMatch) {
+      oldLine = parseInt(hunkHeaderMatch[1], 10);
+      newLine = parseInt(hunkHeaderMatch[2], 10);
       continue;
     }
 
-    if (line.startsWith("@@")) {
-      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      if (match) {
-        oldLine = parseInt(match[1], 10) - 1;
-        newLine = parseInt(match[2], 10) - 1;
-      }
-      formattedDiff += line + "\n";
-      continue;
-    }
-
-    const prefix = line[0];
-
-    if (prefix === " ") {
+    if (line.startsWith(" ")) {
+      result.push(` [${oldLine}] ${line.slice(1)}`);
       oldLine++;
       newLine++;
-      formattedDiff += `${prefix}[${newLine}] ${line.slice(1)}\n`;
-    } else if (prefix === "+") {
-      newLine++;
-      formattedDiff += `${prefix}[${newLine}] ${line.slice(1)}\n`;
-    } else if (prefix === "-") {
+    } else if (line.startsWith("-")) {
+      result.push(`-[${oldLine}] ${line.slice(1)}`);
       oldLine++;
-      formattedDiff += `${prefix}[${oldLine}] ${line.slice(1)}\n`;
-    } else {
-      formattedDiff += line + "\n";
+    } else if (line.startsWith("+")) {
+      result.push(`+[${newLine}] ${line.slice(1)}`);
+      newLine++;
     }
   }
-  return formattedDiff;
+
+  return result.join("\n");
 }
