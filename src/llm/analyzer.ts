@@ -168,11 +168,6 @@ function generatePrompt(
   rules: CommentRules,
   prContext?: PRContext
 ): string {
-  // Log PR context if available
-  if (prContext) {
-    core.info(diff);
-  }
-
   // Create a system prompt that instructs the LLM on how to analyze the code
   const systemPrompt = `
 ${ROOT_PROMPT}
@@ -385,11 +380,7 @@ function parseResponse(response: string): AnalysisResults {
       // Check if comment has required fields
       if (!comment.type || !comment.body) {
         core.warning(
-          `Skipping invalid comment due to missing required fields. Comment data: ${JSON.stringify(
-            comment,
-            null,
-            2
-          )}`
+          `Skipping invalid comment due to missing required fields.`
         );
         continue;
       }
@@ -398,11 +389,7 @@ function parseResponse(response: string): AnalysisResults {
       if (comment.type === "line") {
         if (!("file" in comment) || !("line" in comment)) {
           core.warning(
-            `Skipping invalid line comment due to missing file or line. Comment data: ${JSON.stringify(
-              comment,
-              null,
-              2
-            )}`
+            `Skipping invalid line comment due to missing file or line.`
           );
           continue;
         }
@@ -425,13 +412,7 @@ function parseResponse(response: string): AnalysisResults {
       }
       // Skip unknown comment types
       else {
-        core.warning(
-          `Skipping comment with unknown type. Comment data: ${JSON.stringify(
-            comment,
-            null,
-            2
-          )}`
-        );
+        core.warning(`Skipping comment with unknown type.`);
       }
     }
 
