@@ -43,6 +43,7 @@ jobs:
           pr-number: ${{ github.event.pull_request.number || 1 }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
           llm-provider: "openai"
+          llm-model: "03-mini-high"
           exclude-files: "src/types.ts,**/*.html,dist/**,**/*.md,.musashi"
           # Rules will be read from .musashi file if it exists
           log-level: "debug"
