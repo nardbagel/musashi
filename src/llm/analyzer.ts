@@ -240,8 +240,10 @@ async function callOpenAIApi(
             content: prompt,
           },
         ],
-        temperature: 0.3,
-        max_completion_tokens: 2000,
+        ...(model !== "o3-mini" ? { temperature: 0.3 } : {}),
+        ...(model === "o3-mini"
+          ? { max_completion_tokens: 2000 }
+          : { max_tokens: 2000 }),
       },
       {
         headers: {
