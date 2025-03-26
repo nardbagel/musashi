@@ -361,7 +361,8 @@ function parseResponse(response: string): AnalysisResults {
     if (codeBlockMatch && codeBlockMatch[1]) {
       cleanedResponse = codeBlockMatch[1];
     }
-
+    core.info(`Cleaned response: 
+      ${cleanedResponse}`);
     // Try to parse the response as JSON
     const parsedResponse = JSON.parse(
       cleanedResponse
