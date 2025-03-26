@@ -436,7 +436,7 @@ function parseResponse(response: string): AnalysisResults {
   }
 }
 
-function formatDiffWithLineNumbers(diff: string): string {
+export function formatDiffWithLineNumbers(diff: string): string {
   const lines = diff.split("\n");
   const result: string[] = [];
 

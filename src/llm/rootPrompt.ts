@@ -38,7 +38,6 @@ IMPORTANT: Format your response as raw JSON without any markdown formatting, cod
          "type": "line",  // "line" for file-specific comments, "pr" for general comments
          "file": "path/to/file",  // Only for "line" type
          "line": 42,  // Line number from [42] in the line you're commenting on
-         "side": "RIGHT",  // "RIGHT" for additions, "LEFT" for deletions
          "body": "Your comment text here"
        }
      ],

@@ -56,8 +56,7 @@ export async function postComments(
           repo,
           prNumber,
           comment,
-          pr.head.sha,
-          file.patch
+          pr.head.sha
         );
       } else if (comment.type === "pr") {
         // Post a general PR comment
@@ -81,47 +80,6 @@ export async function postComments(
   }
 }
 
-interface DiffLineInfo {
-  line: number;
-  side: "LEFT" | "RIGHT";
-}
-
-function getLineInfoFromDiff(
-  patch: string | undefined,
-  targetLine: number
-): DiffLineInfo | null {
-  if (!patch) return null;
-
-  const lines = patch.split("\n");
-  let currentLine = 0;
-  let diffLine = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    if (line.startsWith("@@")) {
-      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      if (match) {
-        currentLine = parseInt(match[1], 10) - 1;
-      }
-      continue;
-    }
-
-    // Now we check both + and - lines
-    if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
-      currentLine++;
-      if (currentLine === targetLine) {
-        diffLine = i + 1;
-        // Determine side based on the line prefix
-        const side = line.startsWith("-") ? "LEFT" : "RIGHT";
-        return { line: diffLine, side };
-      }
-    }
-  }
-
-  return null;
-}
-
 /**
  * Post a line-specific comment
  *
@@ -137,8 +95,7 @@ async function postLineComment(
   repo: string,
   prNumber: number,
   comment: LineComment,
-  commitSha: string,
-  patch: string | undefined
+  commitSha: string
 ): Promise<void> {
   const params: {
     owner: string;
@@ -163,16 +120,7 @@ async function postLineComment(
   try {
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
 
-    // Get line and side information
-    const lineInfo = getLineInfoFromDiff(patch, comment.line);
-    if (!lineInfo) {
-      core.warning(
-        `Skipping comment for ${comment.file}:${comment.line} - could not map to diff line`
-      );
-      return;
-    }
-
-    params.line = lineInfo.line;
+    params.line = comment.line;
     await octokit.rest.pulls.createReviewComment(params);
   } catch (error) {
     if (error instanceof Error) {

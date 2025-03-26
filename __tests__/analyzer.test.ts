@@ -1,5 +1,5 @@
 import axios from "axios";
-import { analyzeDiff } from "../src/llm/analyzer";
+import { analyzeDiff, formatDiffWithLineNumbers } from "../src/llm/analyzer";
 import { CommentRules, LLMProvider } from "../src/types";
 
 // Mock axios
@@ -330,5 +330,49 @@ index 8901234..5678901 100644
       (comment) => comment.type === "line" && comment.file === ".musashi"
     );
     expect(musashiComments).toHaveLength(0);
+  });
+});
+
+const input = [
+  `@@ -1,3 +1,4 @@
+ const a = 1;
+-const b = 2;
++const b = 3;
++const c = 4;
+ const d = 5;`,
+  `@@ -1,2 +1,3 @@
+ line1
++added1
+ line2
+@@ -10,2 +11,2 @@
+-removed1
++changed1
+ unchanged1`,
+];
+export const expected = [
+  ` [1] const a = 1;
+-[2] const b = 2;
++[2] const b = 3;
++[3] const c = 4;
+ [3] const d = 5;`,
+  ` [1] line1
++[2] added1
+ [2] line2
+-[10] removed1
++[11] changed1
+ [11] unchanged1`,
+];
+
+describe("formatDiffWithLineNumbers", () => {
+  test("formats diff with line numbers correctly", () => {
+    expect(formatDiffWithLineNumbers(input[0])).toBe(expected[0]);
+  });
+
+  test("handles multiple hunks", () => {
+    expect(formatDiffWithLineNumbers(input[1])).toBe(expected[1]);
+  });
+
+  test("handles empty diff", () => {
+    expect(formatDiffWithLineNumbers("")).toBe("");
   });
 });
