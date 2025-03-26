@@ -166,7 +166,7 @@ async function postLineComment(
     // Get line and side information
     const lineInfo = getLineInfoFromDiff(patch, comment.line);
     if (!lineInfo) {
-      core.info(
+      core.warning(
         `Skipping comment for ${comment.file}:${comment.line} - could not map to diff line`
       );
       return;
