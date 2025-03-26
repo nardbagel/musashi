@@ -36,6 +36,7 @@ jobs:
 
       - name: Run PR Analysis on this repo
         uses: ./
+        continue-on-error: true
         with:
           github-token: ${{ secrets.MUSASHI }}
           # repo-name will use default (github.repository)
