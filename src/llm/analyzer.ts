@@ -51,7 +51,14 @@ export async function analyzeDiff(
 
     // Format the diff with line numbers before creating the prompt
     const formattedDiff = formatDiffWithLineNumbers(diff);
-    const prompt = generatePrompt(formattedDiff, rules, prContext);
+    const prompt = generatePrompt(formattedDiff, prContext);
+    const systemPrompt = `${ROOT_PROMPT}
+
+${
+  rules
+    ? `Additional instructions specific to doing PR reviews in this git repository: ${rules}`
+    : ""
+}`;
 
     // Call the appropriate LLM API based on provider
     let response: string;
@@ -59,12 +66,18 @@ export async function analyzeDiff(
       case "anthropic":
         response = await callAnthropicApi(
           prompt,
+          systemPrompt,
           apiKey,
           model || "claude-3-7-sonnet-20250219"
         );
         break;
       case "openai":
-        response = await callOpenAIApi(prompt, apiKey, model || "gpt-4o-mini");
+        response = await callOpenAIApi(
+          prompt,
+          systemPrompt,
+          apiKey,
+          model || "o3-mini"
+        );
         break;
       default:
         throw new Error(`Unsupported LLM provider: ${provider}`);
@@ -163,51 +176,35 @@ function filterCommentsByExcludePatterns(
  * @param prContext - Pull request context including existing comments
  * @returns The formatted prompt
  */
-function generatePrompt(
-  diff: string,
-  rules: CommentRules,
-  prContext?: PRContext
-): string {
-  // Create a system prompt that instructs the LLM on how to analyze the code
-  const systemPrompt = `
-${ROOT_PROMPT}
-
-${
-  rules
-    ? `Additional instructions specific to doing PR reviews in this git repository: ${rules}`
-    : ""
-}
-`;
-
+function generatePrompt(diff: string, prContext?: PRContext): string {
   // Add PR context if available
   let prContextText = "";
   if (prContext) {
     prContextText = `
-## Pull Request Information
-Title: ${prContext.title}
+    ## Pull Request Information
+    Title: ${prContext.title}
 
-Description:
-${prContext.description}
+    Description:
+    ${prContext.description}
 
-${
-  prContext.existingComments.lineComments.length > 0
-    ? `
-## Relevant Comments:
-${prContext.existingComments.lineComments.join("\n\n")}
-`
-    : ""
-}
+    ${
+      prContext.existingComments.lineComments.length > 0
+        ? `
+    ## Relevant Comments:
+    ${prContext.existingComments.lineComments.join("\n\n")}
+    `
+        : ""
+    }
 
-Use this context to better understand the author's intentions, but focus your comments on the code changes.
-`;
+    Use this context to better understand the author's intentions, but focus your comments on the code changes.
+    `;
   }
 
   // Combine the system prompt with context and diff
-  return `${systemPrompt}
-${prContextText}
-Here is the pull request diff to analyze:
+  return `${prContextText}
+    Pull request diff to analyze:
 
-${diff}`;
+    ${diff}`;
 }
 
 /**
@@ -220,6 +217,7 @@ ${diff}`;
  */
 async function callOpenAIApi(
   prompt: string,
+  systemPrompt: string,
   apiKey: string,
   model: string
 ): Promise<string> {
@@ -233,16 +231,17 @@ async function callOpenAIApi(
         messages: [
           {
             role: "system",
-            content:
-              "You are a code review assistant that analyzes PR diffs and provides helpful comments.",
+            content: systemPrompt,
           },
           {
             role: "user",
             content: prompt,
           },
         ],
-        temperature: 0.3,
-        max_tokens: 2000,
+        ...(model !== "o3-mini" ? { temperature: 0.3 } : {}),
+        ...(model === "o3-mini"
+          ? { max_completion_tokens: 2000 }
+          : { max_tokens: 2000 }),
       },
       {
         headers: {
@@ -286,6 +285,7 @@ async function callOpenAIApi(
  */
 async function callAnthropicApi(
   prompt: string,
+  systemPrompt: string,
   apiKey: string,
   model: string
 ): Promise<string> {
@@ -298,6 +298,10 @@ async function callAnthropicApi(
         model: model,
         max_tokens: 2000,
         messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
           {
             role: "user",
             content: prompt,
@@ -355,7 +359,8 @@ function parseResponse(response: string): AnalysisResults {
     if (codeBlockMatch && codeBlockMatch[1]) {
       cleanedResponse = codeBlockMatch[1];
     }
-
+    core.info(`Cleaned response: 
+      ${cleanedResponse}`);
     // Try to parse the response as JSON
     const parsedResponse = JSON.parse(
       cleanedResponse
