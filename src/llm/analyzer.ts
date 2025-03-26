@@ -52,15 +52,13 @@ export async function analyzeDiff(
     // Format the diff with line numbers before creating the prompt
     const formattedDiff = formatDiffWithLineNumbers(diff);
     const prompt = generatePrompt(formattedDiff, prContext);
-    const systemPrompt = `
-    ${ROOT_PROMPT}
-    
-    ${
-      rules
-        ? `Additional instructions specific to doing PR reviews in this git repository: ${rules}`
-        : ""
-    }
-    `;
+    const systemPrompt = `${ROOT_PROMPT}
+
+${
+  rules
+    ? `Additional instructions specific to doing PR reviews in this git repository: ${rules}`
+    : ""
+}`;
 
     // Call the appropriate LLM API based on provider
     let response: string;
@@ -78,7 +76,7 @@ export async function analyzeDiff(
           prompt,
           systemPrompt,
           apiKey,
-          model || "gpt-4o-mini"
+          model || "o3-mini"
         );
         break;
       default:
