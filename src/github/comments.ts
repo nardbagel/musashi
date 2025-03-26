@@ -43,6 +43,7 @@ export async function postComments(
           (f: { filename: string; patch?: string }) =>
             f.filename === comment.file
         );
+
         if (!file) {
           core.warning(`File ${comment.file} not found in PR`);
           continue;
@@ -122,75 +123,6 @@ function getLineInfoFromDiff(
 }
 
 /**
- * Validate that a line number exists in the diff and is part of a change
- */
-function validateLineInDiff(
-  patch: string | undefined,
-  targetLine: number
-): { isValid: boolean; codeBlock?: string } {
-  if (!patch) return { isValid: false };
-
-  const lines = patch.split("\n");
-  let currentLine = 0;
-  let blockLines: string[] = [];
-  let inTargetBlock = false;
-  let foundValidLine = false;
-
-  for (const line of lines) {
-    if (line.startsWith("@@")) {
-      // If we were in a block and found our line, we can return
-      if (inTargetBlock && foundValidLine) {
-        return { isValid: true, codeBlock: blockLines.join("\n") };
-      }
-      // Start a new block
-      const match = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      if (match) {
-        currentLine = parseInt(match[1], 10) - 1;
-        blockLines = [line];
-        inTargetBlock = false;
-      }
-      continue;
-    }
-
-    if (line.startsWith("+") || line.startsWith("-") || line.startsWith(" ")) {
-      currentLine++;
-      if (Math.abs(currentLine - targetLine) <= 3) {
-        // Include 3 lines of context
-        if (!inTargetBlock) {
-          inTargetBlock = true;
-        }
-        blockLines.push(line);
-      } else if (inTargetBlock) {
-        // If we've moved past our context window and found our line, return
-        if (foundValidLine) {
-          return { isValid: true, codeBlock: blockLines.join("\n") };
-        }
-        // Reset if we haven't found our line yet
-        inTargetBlock = false;
-        blockLines = [];
-      }
-
-      if (
-        currentLine === targetLine &&
-        (line.startsWith("+") || line.startsWith("-"))
-      ) {
-        foundValidLine = true;
-      }
-    }
-  }
-
-  // Handle case where target line is in the last block
-  if (foundValidLine) {
-    return { isValid: true, codeBlock: blockLines.join("\n") };
-  }
-
-  return {
-    isValid: false,
-    codeBlock: blockLines.length > 0 ? blockLines.join("\n") : undefined,
-  };
-}
-
-/**
  * Post a line-specific comment
  *
  * @param octokit - Initialized Octokit client
@@ -231,28 +163,11 @@ async function postLineComment(
   try {
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
 
-    // First validate that the line exists in the diff and is a changed line
-    const validation = validateLineInDiff(patch, comment.line);
-    if (!validation.isValid) {
-      core.info(
-        `Skipping comment for ${comment.file}:${
-          comment.line
-        } - line is not changed in the diff\nContext:\n${
-          validation.codeBlock || "No context available"
-        }`
-      );
-      return;
-    }
-
     // Get line and side information
     const lineInfo = getLineInfoFromDiff(patch, comment.line);
     if (!lineInfo) {
       core.info(
-        `Skipping comment for ${comment.file}:${
-          comment.line
-        } - could not map to diff line\nContext:\n${
-          validation.codeBlock || "No context available"
-        }`
+        `Skipping comment for ${comment.file}:${comment.line} - could not map to diff line`
       );
       return;
     }
