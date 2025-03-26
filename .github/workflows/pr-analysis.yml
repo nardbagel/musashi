@@ -36,11 +36,13 @@ jobs:
 
       - name: Run PR Analysis on this repo
         uses: ./
+        continue-on-error: true
         with:
           github-token: ${{ secrets.MUSASHI }}
           # repo-name will use default (github.repository)
           pr-number: ${{ github.event.pull_request.number || 1 }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
           llm-provider: "openai"
+          exclude-files: "src/types.ts,**/*.html,dist/**,**/*.md,.musashi"
           # Rules will be read from .musashi file if it exists
           log-level: "debug"

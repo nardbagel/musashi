@@ -23,15 +23,10 @@ export interface AnalysisResults {
   summary: string;
 }
 
-// Configuration rules
-export interface CommentRules {
-  customInstructions?: string;
-  includePaths?: string[];
-  excludePaths?: string[];
-  [key: string]: any;
-}
+// Comment rules configuration
+export type CommentRules = string;
 
-// LLM Provider types
+// LLM provider type
 export type LLMProvider = "openai" | "anthropic";
 
 // API Response types

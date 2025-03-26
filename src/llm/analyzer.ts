@@ -11,6 +11,7 @@ import {
   LLMProvider,
   OpenAIResponse,
 } from "../types";
+import { ROOT_PROMPT } from "./rootPrompt";
 
 /**
  * Analyze a PR diff using an LLM and generate comments
@@ -21,6 +22,7 @@ import {
  * @param provider - LLM provider ('openai' or 'anthropic')
  * @param model - Model name to use
  * @param prContext - Pull request context including existing comments
+ * @param excludeFiles - List of files to exclude from analysis
  * @returns Analysis results with comments and summary
  */
 export async function analyzeDiff(
@@ -29,21 +31,27 @@ export async function analyzeDiff(
   rules: CommentRules,
   provider: LLMProvider = "openai",
   model?: string,
-  prContext?: PRContext
+  prContext?: PRContext,
+  excludeFiles: string[] = []
 ): Promise<AnalysisResults> {
   try {
     core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
 
-    // Filter diff by include/exclude paths if specified
-    if (rules.includePaths?.length || rules.excludePaths?.length) {
-      diff = filterDiffByPaths(diff, rules.includePaths, rules.excludePaths);
-      core.debug(
-        `Filtered diff to ${diff.length} bytes based on path patterns`
-      );
+    // Always exclude .musashi file
+    const allExcludePatterns = [".musashi", ...excludeFiles];
+    core.debug(
+      `Excluding files matching patterns: ${allExcludePatterns.join(", ")}`
+    );
+
+    // Filter out excluded files from the diff
+    if (allExcludePatterns.length > 0) {
+      diff = filterDiffByExcludePatterns(diff, allExcludePatterns);
+      core.debug(`Filtered diff to ${diff.length} bytes after excluding files`);
     }
 
-    // Prepare the prompt for the LLM
-    const prompt = generatePrompt(diff, rules, prContext);
+    // Format the diff with line numbers before creating the prompt
+    const formattedDiff = formatDiffWithLineNumbers(diff);
+    const prompt = generatePrompt(formattedDiff, rules, prContext);
 
     // Call the appropriate LLM API based on provider
     let response: string;
@@ -66,14 +74,13 @@ export async function analyzeDiff(
     const analysisResults = parseResponse(response);
 
     // Filter out comments for excluded files
-    if (rules.includePaths?.length || rules.excludePaths?.length) {
-      analysisResults.comments = filterCommentsByPaths(
+    if (allExcludePatterns.length > 0) {
+      analysisResults.comments = filterCommentsByExcludePatterns(
         analysisResults.comments,
-        rules.includePaths,
-        rules.excludePaths
+        allExcludePatterns
       );
       core.debug(
-        `Filtered comments to ${analysisResults.comments.length} based on path patterns`
+        `Filtered to ${analysisResults.comments.length} comments after excluding files`
       );
     }
 
@@ -92,17 +99,11 @@ export async function analyzeDiff(
 }
 
 /**
- * Filter the diff to only include files matching the include/exclude patterns
- *
- * @param diff - The full PR diff
- * @param includePaths - Glob patterns for files to include
- * @param excludePaths - Glob patterns for files to exclude
- * @returns Filtered diff
+ * Filter the diff to exclude files matching the exclude patterns
  */
-function filterDiffByPaths(
+function filterDiffByExcludePatterns(
   diff: string,
-  includePaths?: string[],
-  excludePaths?: string[]
+  excludePatterns: string[]
 ): string {
   // Split the diff into sections by file
   const diffSections = diff.split("diff --git ");
@@ -129,8 +130,8 @@ function filterDiffByPaths(
 
     const filePath = filePathMatch[1];
 
-    // Check if the file should be included or excluded
-    if (shouldIncludeFile(filePath, includePaths, excludePaths)) {
+    // Skip if the file matches any exclude pattern
+    if (!micromatch.isMatch(filePath, excludePatterns)) {
       filteredSections.push(processedSection);
     }
   }
@@ -139,51 +140,19 @@ function filterDiffByPaths(
 }
 
 /**
- * Filter comments to only include those for files matching the include/exclude patterns
- *
- * @param comments - All comments
- * @param includePaths - Glob patterns for files to include
- * @param excludePaths - Glob patterns for files to exclude
- * @returns Filtered comments
+ * Filter comments to exclude those for files matching the exclude patterns
  */
-function filterCommentsByPaths(
+function filterCommentsByExcludePatterns(
   comments: Comment[],
-  includePaths?: string[],
-  excludePaths?: string[]
+  excludePatterns: string[]
 ): Comment[] {
   return comments.filter((comment) => {
     // Keep PR-level comments
     if (comment.type !== "line") return true;
 
-    // For line comments, check the file path
-    return shouldIncludeFile(comment.file, includePaths, excludePaths);
+    // For line comments, check if the file matches any exclude pattern
+    return !micromatch.isMatch(comment.file, excludePatterns);
   });
-}
-
-/**
- * Determine if a file should be included based on the include/exclude patterns
- *
- * @param filePath - Path of the file
- * @param includePaths - Glob patterns for files to include
- * @param excludePaths - Glob patterns for files to exclude
- * @returns Whether the file should be included
- */
-function shouldIncludeFile(
-  filePath: string,
-  includePaths?: string[],
-  excludePaths?: string[]
-): boolean {
-  // If no include paths are specified, include everything by default
-  const includeFile =
-    !includePaths?.length || micromatch.isMatch(filePath, includePaths);
-
-  // If no exclude paths are specified, exclude nothing
-  const excludeFile = excludePaths?.length
-    ? micromatch.isMatch(filePath, excludePaths)
-    : false;
-
-  // Include the file if it matches include patterns and doesn't match exclude patterns
-  return includeFile && !excludeFile;
 }
 
 /**
@@ -201,50 +170,11 @@ function generatePrompt(
 ): string {
   // Create a system prompt that instructs the LLM on how to analyze the code
   const systemPrompt = `
-You are a code review assistant. Your task is to analyze the following pull request diff and provide helpful comments.
+${ROOT_PROMPT}
 
 ${
-  prContext
-    ? `
-Pull Request Information:
-Title: ${prContext.title}
-Description: ${prContext.description}
-
-Existing Comments:
-Line Comments:
-${prContext.existingComments.lineComments
-  .map((c) => `- ${c.path}:${c.line}: ${c.body}`)
-  .join("\n")}
-
-PR Comments:
-${prContext.existingComments.prComments.map((c) => `- ${c.body}`).join("\n")}
-
-Please consider the existing comments above and avoid making similar comments. Instead, provide new insights or expand upon existing comments if you have additional valuable information.
-`
-    : ""
-}
-
-Please follow these guidelines:
-1. Focus on code quality, potential bugs, security issues, and performance concerns
-2. Be specific and actionable in your feedback
-3. Use a constructive and helpful tone
-4. Avoid repeating points that have already been made in existing comments
-5. IMPORTANT: Format your response as raw JSON without any markdown formatting, code blocks, or backticks. The response should be a valid JSON object with the following structure:
-   {
-     "comments": [
-       {
-         "type": "line",  // "line" for file-specific comments, "pr" for general comments
-         "file": "path/to/file",  // Only for "line" type
-         "line": 42,  // Line number, only for "line" type
-         "body": "Your comment text here"
-       }
-     ],
-     "summary": "Brief summary of your overall assessment"
-   }
-
-${
-  rules.customInstructions
-    ? `Additional instructions: ${rules.customInstructions}`
+  rules
+    ? `Additional instructions specific to doing PR reviews in this git repository: ${rules}`
     : ""
 }
 `;
@@ -353,11 +283,6 @@ async function callOpenAIApi(
 
 /**
  * Call the Anthropic API with the prepared prompt
- *
- * @param prompt - The formatted prompt
- * @param apiKey - API key for Anthropic
- * @param model - Model name to use
- * @returns The LLM response
  */
 async function callAnthropicApi(
   prompt: string,
@@ -419,9 +344,6 @@ async function callAnthropicApi(
 
 /**
  * Parse the LLM response into structured comments
- *
- * @param response - The raw LLM response
- * @returns Structured analysis results
  */
 function parseResponse(response: string): AnalysisResults {
   try {
@@ -457,7 +379,9 @@ function parseResponse(response: string): AnalysisResults {
     for (const comment of parsedResponse.comments as Array<any>) {
       // Check if comment has required fields
       if (!comment.type || !comment.body) {
-        core.warning(`Skipping invalid comment: ${JSON.stringify(comment)}`);
+        core.warning(
+          `Skipping invalid comment due to missing required fields.`
+        );
         continue;
       }
 
@@ -465,7 +389,7 @@ function parseResponse(response: string): AnalysisResults {
       if (comment.type === "line") {
         if (!("file" in comment) || !("line" in comment)) {
           core.warning(
-            `Skipping invalid line comment: ${JSON.stringify(comment)}`
+            `Skipping invalid line comment due to missing file or line.`
           );
           continue;
         }
@@ -488,7 +412,7 @@ function parseResponse(response: string): AnalysisResults {
       }
       // Skip unknown comment types
       else {
-        core.warning(`Skipping comment with unknown type: ${comment.type}`);
+        core.warning(`Skipping comment with unknown type.`);
       }
     }
 
@@ -510,4 +434,35 @@ function parseResponse(response: string): AnalysisResults {
       }`,
     };
   }
+}
+
+export function formatDiffWithLineNumbers(diff: string): string {
+  const lines = diff.split("\n");
+  const result: string[] = [];
+
+  let oldLine = 0;
+  let newLine = 0;
+
+  for (const line of lines) {
+    const hunkHeaderMatch = /^@@ -(\d+),?\d* \+(\d+),?\d* @@/.exec(line);
+    if (hunkHeaderMatch) {
+      oldLine = parseInt(hunkHeaderMatch[1], 10);
+      newLine = parseInt(hunkHeaderMatch[2], 10);
+      continue;
+    }
+
+    if (line.startsWith(" ")) {
+      result.push(` [${oldLine}] ${line.slice(1)}`);
+      oldLine++;
+      newLine++;
+    } else if (line.startsWith("-")) {
+      result.push(`-[${oldLine}] ${line.slice(1)}`);
+      oldLine++;
+    } else if (line.startsWith("+")) {
+      result.push(`+[${newLine}] ${line.slice(1)}`);
+      newLine++;
+    }
+  }
+
+  return result.join("\n");
 }

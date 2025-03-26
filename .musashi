@@ -1,12 +1,3 @@
-{
-  "customInstructions": "Focus on TypeScript best practices, code quality, and potential security issues",
-  "includePaths": [
-    "src/**/*.ts",
-    "src/**/*.tsx"
-  ],
-  "excludePaths": [
-    "**/*.test.ts",
-    "**/*.spec.ts",
-    "**/dist/**"
-  ]
-}
+Focus on TypeScript best practices, code quality, and potential security issues
+
+Make sure that there isn't any root prompt text anywhere except in the rootPrompt.ts file.

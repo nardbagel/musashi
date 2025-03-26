@@ -43,6 +43,7 @@ export async function postComments(
           (f: { filename: string; patch?: string }) =>
             f.filename === comment.file
         );
+
         if (!file) {
           core.warning(`File ${comment.file} not found in PR`);
           continue;
@@ -55,8 +56,7 @@ export async function postComments(
           repo,
           prNumber,
           comment,
-          pr.head.sha,
-          file.patch
+          pr.head.sha
         );
       } else if (comment.type === "pr") {
         // Post a general PR comment
@@ -81,51 +81,6 @@ export async function postComments(
 }
 
 /**
- * Determine line and side parameters for creating a review comment
- *
- * @param patch - The file patch from GitHub API
- * @param targetLine - The line number to find
- * @returns The line number in the diff and side information
- */
-function getLineInfoFromDiff(
-  patch: string | undefined,
-  targetLine: number
-): { line: number; side: "RIGHT" } | null {
-  if (!patch) return null;
-
-  const lines = patch.split("\n");
-  let currentLine = 0;
-  let diffLine = 0;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-
-    // Check if this is a hunk header line
-    if (line.startsWith("@@")) {
-      // Reset line count at each hunk header
-      const match = line.match(/@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
-      if (match) {
-        // Get the starting line number in the new file for this hunk
-        const newStart = parseInt(match[1], 10);
-        currentLine = newStart - 1; // Adjust because we'll increment before using
-      }
-      continue;
-    }
-
-    if (line.startsWith("+") || line.startsWith(" ")) {
-      currentLine++;
-      if (currentLine === targetLine) {
-        // Calculate the line number in the diff, factoring in hunk headers
-        diffLine = i + 1; // +1 because line numbers are 1-indexed
-        return { line: diffLine, side: "RIGHT" };
-      }
-    }
-  }
-
-  return null;
-}
-
-/**
  * Post a line-specific comment
  *
  * @param octokit - Initialized Octokit client
@@ -140,38 +95,48 @@ async function postLineComment(
   repo: string,
   prNumber: number,
   comment: LineComment,
-  commitSha: string,
-  patch: string | undefined
+  commitSha: string
 ): Promise<void> {
+  const params: {
+    owner: string;
+    repo: string;
+    pull_number: number;
+    body: string;
+    commit_id: string;
+    path: string;
+    line: number;
+    side: "RIGHT";
+  } = {
+    owner,
+    repo,
+    pull_number: prNumber,
+    body: comment.body,
+    commit_id: commitSha,
+    path: comment.file,
+    line: 0,
+    side: "RIGHT",
+  };
+
   try {
     core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
 
-    // Get line and side information
-    const lineInfo = getLineInfoFromDiff(patch, comment.line);
-    if (!lineInfo) {
-      core.warning(
-        `Could not find line information for line ${comment.line} in file ${comment.file}`
-      );
-      return;
-    }
-
-    const params = {
-      owner,
-      repo,
-      pull_number: prNumber,
-      body: comment.body,
-      commit_id: commitSha,
-      path: comment.file,
-      line: lineInfo.line,
-      side: lineInfo.side,
-    };
-
+    params.line = comment.line;
     await octokit.rest.pulls.createReviewComment(params);
   } catch (error) {
     if (error instanceof Error) {
-      core.warning(`Failed to post line comment: ${error.message}`);
+      core.warning(
+        `Failed to post line comment: ${
+          error.message
+        }\nParams: ${JSON.stringify(params, null, 2)}`
+      );
     } else {
-      core.warning(`Failed to post line comment: Unknown error`);
+      core.warning(
+        `Failed to post line comment: Unknown error\nParams: ${JSON.stringify(
+          params,
+          null,
+          2
+        )}`
+      );
     }
   }
 }
