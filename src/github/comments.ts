@@ -118,7 +118,7 @@ async function postLineComment(
   };
 
   try {
-    core.debug(`Posting line comment to ${comment.file}:${comment.line}`);
+    core.info(`Posting line comment to ${comment.file}:${comment.line}`);
 
     params.line = comment.line;
     await octokit.rest.pulls.createReviewComment(params);
