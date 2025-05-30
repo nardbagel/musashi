@@ -252,7 +252,7 @@ index 8901234..5678901 100644
     expect(result.comments[1].type).toBe("pr");
   });
 
-  test("analyzeDiff should always exclude .musashi files", async () => {
+  test("analyzeDiff should always exclude .cursor/rules files", async () => {
     // Mock the axios response for OpenAI
     mockedAxios.post.mockResolvedValueOnce({
       data: {
@@ -269,7 +269,7 @@ index 8901234..5678901 100644
                   },
                   {
                     type: "line",
-                    file: ".musashi",
+                    file: ".cursor/rules",
                     line: 1,
                     body: "Comment 2",
                   },
@@ -286,7 +286,7 @@ index 8901234..5678901 100644
       },
     });
 
-    // Sample diff with .musashi file
+    // Sample diff with .cursor/rules file
     const diff = `diff --git a/test.js b/test.js
 index 1234567..abcdefg 100644
 --- a/test.js
@@ -294,10 +294,10 @@ index 1234567..abcdefg 100644
 @@ -1,1 +1,1 @@
 -old
 +new
-diff --git a/.musashi b/.musashi
+diff --git a/.cursor/rules b/.cursor/rules
 index 8901234..5678901 100644
---- a/.musashi
-+++ b/.musashi
+--- a/.cursor/rules
++++ b/.cursor/rules
 @@ -1,1 +1,1 @@
 -Focus on performance
 +Focus on security`;
@@ -317,7 +317,7 @@ index 8901234..5678901 100644
       excludeFiles
     );
 
-    // Verify that .musashi file was automatically excluded
+    // Verify that .cursor/rules files were automatically excluded
     expect(result.comments).toHaveLength(2); // 1 line comment + 1 PR comment
     expect(result.comments[0].type).toBe("line");
     if (result.comments[0].type === "line") {
@@ -325,11 +325,11 @@ index 8901234..5678901 100644
     }
     expect(result.comments[1].type).toBe("pr");
 
-    // Verify that no comments were made on .musashi file
-    const musashiComments = result.comments.filter(
-      (comment) => comment.type === "line" && comment.file === ".musashi"
+    // Verify that no comments were made on .cursor/rules file
+    const cursorRulesComments = result.comments.filter(
+      (comment) => comment.type === "line" && comment.file === ".cursor/rules"
     );
-    expect(musashiComments).toHaveLength(0);
+    expect(cursorRulesComments).toHaveLength(0);
   });
 });
 

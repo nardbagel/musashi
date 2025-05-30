@@ -12,6 +12,43 @@ import { CommentRules, LLMProvider } from "./types";
 import { cloneRepository } from "./utils/git";
 
 /**
+ * Process @references in rule content by replacing them with file contents
+ */
+function processReferences(content: string, basePath: string): string {
+  const referenceRegex = /@([^\s\n]+)/g;
+
+  return content.replace(referenceRegex, (match, relativePath) => {
+    try {
+      const fullPath = path.resolve(basePath, relativePath);
+
+      // Security check: ensure the resolved path is within the repository
+      if (!fullPath.startsWith(basePath)) {
+        core.warning(
+          `Skipping reference ${relativePath}: path outside repository`
+        );
+        return match;
+      }
+
+      if (fs.existsSync(fullPath)) {
+        const referencedContent = fs.readFileSync(fullPath, "utf-8");
+        core.debug(`Resolved reference ${relativePath}`);
+        return referencedContent;
+      } else {
+        core.warning(`Referenced file not found: ${relativePath}`);
+        return match;
+      }
+    } catch (error) {
+      core.warning(
+        `Failed to resolve reference ${relativePath}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
+      return match;
+    }
+  });
+}
+
+/**
  * Main function that runs the GitHub Action
  */
 async function run(): Promise<void> {
@@ -55,28 +92,50 @@ async function run(): Promise<void> {
     const repoPath = await cloneRepository(repoName, token);
     core.info(`Repository cloned to ${repoPath}`);
 
-    // Try to load .musashi file for rules
+    // Try to load .cursor/rules/*.mdc files for rules
     let commentRules: CommentRules = "";
-    const musashiPath = path.join(repoPath, ".musashi");
+    const cursorRulesPath = path.join(repoPath, ".cursor", "rules");
 
-    if (fs.existsSync(musashiPath)) {
+    if (fs.existsSync(cursorRulesPath)) {
       try {
-        const musashiContent = fs.readFileSync(musashiPath, "utf-8");
-        commentRules = musashiContent.trim();
-        core.info(`Loaded comment rules from .musashi file`);
+        const mdcFiles = fs
+          .readdirSync(cursorRulesPath)
+          .filter((file) => file.endsWith(".mdc"))
+          .sort(); // Sort for consistent ordering
+
+        if (mdcFiles.length > 0) {
+          const ruleContents = mdcFiles.map((file) => {
+            const filePath = path.join(cursorRulesPath, file);
+            const content = fs.readFileSync(filePath, "utf-8");
+            const processedContent = processReferences(content, repoPath);
+            return `# Rules from ${file}\n${processedContent}`;
+          });
+
+          commentRules = ruleContents.join("\n\n");
+          core.info(
+            `Loaded comment rules from ${
+              mdcFiles.length
+            } .mdc files: ${mdcFiles.join(", ")}`
+          );
+        } else {
+          core.debug(`No .mdc files found in .cursor/rules directory`);
+          commentRules = commentRulesInput;
+        }
       } catch (error) {
         core.warning(
-          `Failed to read .musashi file: ${
+          `Failed to read .cursor/rules/*.mdc files: ${
             error instanceof Error ? error.message : "Unknown error"
           }`
         );
-        // Fall back to input parameter if .musashi file is invalid
+        // Fall back to input parameter if .cursor/rules files are invalid
         commentRules = commentRulesInput;
       }
     } else {
-      // Fall back to input parameter if .musashi file doesn't exist
+      // Fall back to input parameter if .cursor/rules directory doesn't exist
       commentRules = commentRulesInput;
-      core.debug(`No .musashi file found, using provided comment rules`);
+      core.debug(
+        `No .cursor/rules directory found, using provided comment rules`
+      );
     }
 
     // Get PR context and diff

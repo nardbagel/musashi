@@ -37,8 +37,8 @@ export async function analyzeDiff(
   try {
     core.debug(`Analyzing diff (${diff.length} bytes) with ${provider} LLM`);
 
-    // Always exclude .musashi file
-    const allExcludePatterns = [".musashi", ...excludeFiles];
+    // Always exclude .cursor/rules files
+    const allExcludePatterns = [".cursor/rules", ...excludeFiles];
     core.debug(
       `Excluding files matching patterns: ${allExcludePatterns.join(", ")}`
     );

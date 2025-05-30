@@ -36,11 +36,9 @@ jobs:
           # repo-name defaults to the current repository
           pr-number: ${{ github.event.pull_request.number }}
           llm-api-key: ${{ secrets.LLM_API_KEY }}
-          # Comment rules will be read from .musashi file if it exists
+          # Comment rules will be read from .cursor/rules dir if exists
           log-level: "info"
 ```
-
-You can configure the LLM behavior by adding a `.musashi` file to the root of your repository:
 
 ```
 "Focus on security issues and performance improvements"
@@ -48,31 +46,24 @@ You can configure the LLM behavior by adding a `.musashi` file to the root of yo
 
 ## Inputs
 
-| Input           | Description                                                               | Required | Default                    |
-| --------------- | ------------------------------------------------------------------------- | -------- | -------------------------- |
-| `github-token`  | GitHub token for API access                                               | Yes      | N/A                        |
-| `repo-name`     | Target repository name (owner/repo)                                       | No       | `${{ github.repository }}` |
-| `pr-number`     | Pull request number to analyze                                            | Yes      | N/A                        |
-| `llm-api-key`   | API key for the LLM service                                               | Yes      | N/A                        |
-| `comment-rules` | JSON configuration for comment rules (fallback if .musashi doesn't exist) | No       | `{}`                       |
-| `log-level`     | Logging level (debug, info, warn, error)                                  | No       | `info`                     |
-| `llm-provider`  | LLM provider to use (openai or anthropic)                                 | No       | `openai`                   |
-| `llm-model`     | Specific model to use                                                     | No       | provider default           |
+| Input           | Description                                                         | Required | Default                    |
+| --------------- | ------------------------------------------------------------------- | -------- | -------------------------- |
+| `github-token`  | GitHub token for API access                                         | Yes      | N/A                        |
+| `repo-name`     | Target repository name (owner/repo)                                 | No       | `${{ github.repository }}` |
+| `pr-number`     | Pull request number to analyze                                      | Yes      | N/A                        |
+| `llm-api-key`   | API key for the LLM service                                         | Yes      | N/A                        |
+| `comment-rules` | JSON configuration for comment rules (if .cursor/rules don't exist) | No       | `{}`                       |
+| `log-level`     | Logging level (debug, info, warn, error)                            | No       | `info`                     |
+| `llm-provider`  | LLM provider to use (openai or anthropic)                           | No       | `openai`                   |
+| `llm-model`     | Specific model to use                                               | No       | provider default           |
 
 ## Configuration
 
-### Using a .musashi File
+### Using cursor rules
 
-You can configure the action by adding a `.musashi` file to the root of your repository. This file takes precedence over the `comment-rules` input parameter.
+You can configure the action by adding a `.cursor/rules/*.mdc` files to the root of your repository. These files take precedence over the `comment-rules` input parameter.
 
-Example `.musashi` file:
-
-```
-Focus on security issues, performance improvements, and adherence to TypeScript best practices
-
-```
-
-If the `.musashi` file is not found or cannot be parsed, the action will fall back to using the `comment-rules` input parameter.
+If the `.cursor/rules` file is not found or cannot be parsed, the action will fall back to using the `comment-rules` input parameter.
 
 ## Outputs
 
@@ -80,14 +71,6 @@ If the `.musashi` file is not found or cannot be parsed, the action will fall ba
 | ------------------ | ------------------------- |
 | `comment-count`    | Number of comments posted |
 | `analysis-summary` | Summary of the analysis   |
-
-## Comment Rules
-
-You can customize the behavior of the LLM by providing a JSON object with the following properties:
-
-```
-Additional instructions for the LLM
-```
 
 ## Development
 
